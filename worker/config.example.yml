@@ -1,0 +1,22 @@
+# /etc/mcprb/config.yml
+worker_id: home-vm-01
+endpoint: https://mcprb.example.com
+token_file: /etc/mcprb/token
+
+# ジョブごとの作業ディレクトリ。systemd の RuntimeDirectory= と揃える
+runtime_dir: /run/mcprb
+
+# ワーカー側の正。VPS から来た値がこれを超えていたら切り詰めて実行する
+limits:
+  max_memory_mb: 4096
+  max_cpus: 4
+  max_pids: 1024
+  max_timeout_s: 600
+  max_tmpfs_mb: 1024
+  max_context_bytes: 1048576
+  max_output_bytes: 262144
+  max_concurrency: 2
+
+build:
+  cache_ttl_days: 14
+  max_images: 40
