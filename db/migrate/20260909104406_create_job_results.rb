@@ -1,7 +1,8 @@
 class CreateJobResults < ActiveRecord::Migration[8.1]
   def change
     create_table :job_results do |t|
-      t.references :job, null: false, foreign_key: true
+      # 結果はジョブに 1 行だけ。最初に届いたものを採用する
+      t.references :job, null: false, foreign_key: true, index: { unique: true }
       t.string :termination_reason, null: false
       t.integer :exit_code
       t.text :stdout
@@ -18,8 +19,5 @@ class CreateJobResults < ActiveRecord::Migration[8.1]
 
       t.timestamps
     end
-
-    # 結果はジョブに 1 行だけ。最初に届いたものを採用する
-    add_index :job_results, :job_id, unique: true
   end
 end
