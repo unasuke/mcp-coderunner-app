@@ -1,0 +1,41 @@
+# Rails 側だけの値。両方が知っていないと壊れる値（lease の窓、heartbeat の間隔、
+# プロファイル定義、protocol_version）は lib/protocol の定数にある。
+shared:
+  # review_url を組み立てるのに使う
+  base_url: http://localhost:3000
+
+  # script はこれを超えると pending_review、その上を超えると submit_job がエラー
+  script_review_bytes: 65536
+  script_max_bytes: 262144
+
+  # Blueprint の context
+  dockerfile_max_bytes: 65536
+  context_max_bytes: 1048576
+  max_context_files: 50
+
+  # list_blueprints が返す件数
+  blueprint_list_limit: 50
+
+  # 保持期間（日）
+  result_retention_days: 30
+  script_retention_days: 90
+  process_retention_days: 30
+  lease_retention_days: 30
+
+  # 最初のログインで admin になる GitHub のログイン名
+  bootstrap_admin_login: ~
+
+  # ワーカーとのずれを検知するための実装のリビジョン
+  commit_hash: development
+
+# config_for が shared を各環境にマージする
+development:
+
+test:
+  base_url: http://mcprb.invalid
+
+production:
+  base_url: <%= ENV.fetch("MCPRB_BASE_URL", "https://mcprb.example.com") %>
+  bootstrap_admin_login: <%= ENV["BOOTSTRAP_ADMIN_GITHUB_LOGIN"] %>
+  # Kamal がデプロイするリビジョンを渡す。無ければビルド時に埋めた GIT_COMMIT
+  commit_hash: <%= ENV["KAMAL_VERSION"] || ENV["GIT_COMMIT"] || "unknown" %>

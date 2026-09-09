@@ -1,6 +1,22 @@
 Rails.application.routes.draw do
   use_doorkeeper
-  # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
+
+  # MCP のリソースサーバー本体。Anthropic のレンジからのみ到達できる（Caddy 側で絞る）
+  post "mcp" => "mcp#create", as: :mcp
+
+  # ワーカーから。すべてワーカー発の HTTPS
+  namespace :api do
+    namespace :worker do
+      namespace :v1 do
+        post "register" => "registrations#create"
+        post "heartbeat" => "heartbeats#create"
+        post "deregister" => "deregistrations#create"
+        post "lease" => "leases#create"
+        post "jobs/:id/heartbeat" => "jobs#heartbeat", as: :job_heartbeat
+        post "jobs/:id/result" => "jobs#result", as: :job_result
+      end
+    end
+  end
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
   # Can be used by load balancers and uptime monitors to verify that the app is live.

@@ -17,6 +17,11 @@ gem "stimulus-rails"
 # Build JSON APIs with ease [https://github.com/rails/jbuilder]
 gem "jbuilder"
 
+# json 3.0 は JSON.parse の positional な options を落としたが、ActiveSupport 8.1.3.1 は
+# ::JSON.decode で JSON.parse(json, options) と呼ぶ。Ruby 4.0 同梱の 3.0.2 のままだと
+# JSON のリクエストボディが一切パースできない（/mcp も worker API も 500 になる）
+gem "json", "~> 2.9"
+
 # MCP server implementation [https://github.com/modelcontextprotocol/ruby-sdk]
 gem "mcp"
 

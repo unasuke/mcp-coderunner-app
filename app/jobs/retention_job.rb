@@ -3,24 +3,21 @@
 class RetentionJob < ApplicationJob
   queue_as :default
 
-  RESULT_RETENTION = 30.days
-  SCRIPT_RETENTION = 90.days
-  PROCESS_RETENTION = 30.days
-  LEASE_RETENTION = 30.days
-
   def perform(now: Time.current)
-    JobResult.where(created_at: ...(now - RESULT_RETENTION)).delete_all
-    purge_scripts(now)
-    WorkerProcess.where(stopped_at: ...(now - PROCESS_RETENTION)).delete_all
-    Lease.where(released_at: ...(now - LEASE_RETENTION)).delete_all
+    config = Rails.configuration.x.mcprb
+
+    JobResult.where(created_at: ...(now - config.result_retention_days.days)).delete_all
+    purge_scripts(now, config.script_retention_days.days)
+    WorkerProcess.where(stopped_at: ...(now - config.process_retention_days.days)).delete_all
+    Lease.where(released_at: ...(now - config.lease_retention_days.days)).delete_all
   end
 
   private
 
   # script は not null のままにする。消したことは purged_at で表す。
   # 「消した」と「元々空だった」を取り違えないため
-  def purge_scripts(now)
-    Job.finished.where(purged_at: nil).where(created_at: ...(now - SCRIPT_RETENTION)).find_each do |job|
+  def purge_scripts(now, retention)
+    Job.finished.where(purged_at: nil).where(created_at: ...(now - retention)).find_each do |job|
       job.update_columns(script: "", purged_at: now)
     end
   end

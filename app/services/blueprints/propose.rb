@@ -29,15 +29,15 @@ module Blueprints
     private
 
     def validate!
-      if @files.size > Blueprint::MAX_FILES
-        raise Mcp::ToolError.new(:invalid_input, "files は #{Blueprint::MAX_FILES} 件までです")
+      if @files.size > Blueprint.max_files
+        raise McpToolError.new(:invalid_input, "files は #{Blueprint.max_files} 件までです")
       end
 
       total = @dockerfile.bytesize + @files.sum { |file| file[:content].to_s.bytesize }
-      return if total <= Blueprint::MAX_CONTEXT_BYTES
+      return if total <= Blueprint.max_context_bytes
 
-      raise Mcp::ToolError.new(:context_too_large,
-        "context が大きすぎます: #{total} バイト（上限 #{Blueprint::MAX_CONTEXT_BYTES}）")
+      raise McpToolError.new(:context_too_large,
+        "context が大きすぎます: #{total} バイト（上限 #{Blueprint.max_context_bytes}）")
     end
 
     def create!(digest)
@@ -54,7 +54,7 @@ module Blueprints
         end
       )
     rescue ActiveRecord::RecordInvalid => e
-      raise Mcp::ToolError.new(:invalid_input, e.record.errors.full_messages.join(", "))
+      raise McpToolError.new(:invalid_input, e.record.errors.full_messages.join(", "))
     end
   end
 end

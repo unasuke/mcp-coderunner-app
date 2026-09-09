@@ -39,30 +39,30 @@ module Jobs
 
     def validate!
       unless Protocol::ResourceProfile.exist?(@profile)
-        raise Mcp::ToolError.new(:invalid_profile, "知らない profile です: #{@profile}")
+        raise McpToolError.new(:invalid_profile, "知らない profile です: #{@profile}")
       end
 
-      return if @script.bytesize <= Job::MAX_SCRIPT_BYTES
+      return if @script.bytesize <= Job.max_script_bytes
 
-      raise Mcp::ToolError.new(:script_too_large,
-        "script が大きすぎます: #{@script.bytesize} バイト（上限 #{Job::MAX_SCRIPT_BYTES}）")
+      raise McpToolError.new(:script_too_large,
+        "script が大きすぎます: #{@script.bytesize} バイト（上限 #{Job.max_script_bytes}）")
     end
 
     # digest ならそのまま引く。name なら同名で最新の approved を使う
     def resolve_blueprint
       if @blueprint_ref.match?(DIGEST_FORMAT)
         Blueprint.find_by(digest: @blueprint_ref) ||
-          raise(Mcp::ToolError.new(:blueprint_not_found, "digest が見つかりません: #{@blueprint_ref}"))
+          raise(McpToolError.new(:blueprint_not_found, "digest が見つかりません: #{@blueprint_ref}"))
       else
         Blueprint.latest_approved(@blueprint_ref).first ||
-          raise(Mcp::ToolError.new(:not_approved, "承認済みの Blueprint がありません: #{@blueprint_ref}"))
+          raise(McpToolError.new(:not_approved, "承認済みの Blueprint がありません: #{@blueprint_ref}"))
       end
     end
 
     def review_needed?(blueprint)
       !blueprint.approved? ||
         Protocol::ResourceProfile.requires_approval?(@profile) ||
-        @script.bytesize > Job::REVIEW_SCRIPT_BYTES
+        @script.bytesize > Job.review_script_bytes
     end
   end
 end
