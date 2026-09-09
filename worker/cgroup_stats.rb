@@ -14,10 +14,10 @@ module Worker
 
     attr_reader :cpu_time_ms, :max_rss_bytes, :oom_kills, :pids_max_events
 
-    def initialize(pid, interval: INTERVAL, cgroup_root: CGROUP_ROOT)
+    def initialize(pid, interval: INTERVAL, cgroup_root: CGROUP_ROOT, base: nil)
       @pid = pid
       @interval = interval
-      @base = self.class.resolve_base(pid, cgroup_root:)
+      @base = base || self.class.resolve_base(pid, cgroup_root:)
       @oom_kills = 0
       @pids_max_events = 0
       @mutex = Mutex.new

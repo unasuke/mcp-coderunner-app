@@ -28,6 +28,7 @@ module Worker
       started = monotonic
       applied = @policy.clamp(payload.limits)
 
+      validate_identifiers!(payload)
       @policy.validate_context!(payload.blueprint.dockerfile, payload.blueprint.files)
       tag = @builder.ensure_image!(
         digest: payload.blueprint.digest,
@@ -76,7 +77,10 @@ module Worker
       end
     end
 
+    public
+
     # --rm は付けない。終了と同時にコンテナが消えると State.OOMKilled を読めない。
+    # 引数列そのものが検証の対象になるので public にしている。
     def run_args(payload, applied:, tag:, workdir:, container:)
       memory = "#{applied.fetch(:memory_mb)}m"
       args = [
@@ -104,11 +108,21 @@ module Worker
       args + [ tag ] + Array(payload.entrypoint)
     end
 
+    private
+
     def prepare_workdir(payload)
       workdir = File.join(job_dir(payload), "work")
       FileUtils.mkdir_p(workdir)
       File.write(File.join(workdir, File.basename(Protocol::Constants::SCRIPT_PATH)), payload.script)
       workdir
+    end
+
+    # VPS から来た識別子をそのままパスとコンテナ名に使うので、形を確かめてから使う。
+    # ワーカーは VPS を全面的には信用しない。
+    def validate_identifiers!(payload)
+      [ payload.job_id, payload.lease_id ].each do |id|
+        raise PolicyRejected, "invalid identifier: #{id.inspect}" unless id.to_s.match?(/\A[0-9]+\z/)
+      end
     end
 
     def job_dir(payload)
@@ -130,9 +144,16 @@ module Worker
       Docker.inspect_json(container)&.fetch("State", nil)
     end
 
+    # docker のバージョンによって sha256: が付いたり付かなかったりする。
+    # DB に入る形を揃えたいので、ここで正規化しておく。
     def image_digest(tag)
       result = Docker.run("image", "inspect", "--format", "{{.Id}}", tag)
-      result.success? ? result.stdout.strip : nil
+      return nil unless result.success?
+
+      id = result.stdout.strip
+      return nil if id.empty?
+
+      id.start_with?("sha256:") ? id : "sha256:#{id}"
     end
 
     def reason_for(state:, supervisor:, stats:, stderr:)

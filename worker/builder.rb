@@ -79,11 +79,23 @@ module Worker
       File.write(File.join(dir, "Dockerfile"), dockerfile)
 
       files.each do |file|
-        path = File.join(dir, file.path)
+        path = resolve_within(dir, file.path)
         FileUtils.mkdir_p(File.dirname(path))
         File.write(path, file.content)
         File.chmod(file.executable ? 0o755 : 0o644, path)
       end
+    end
+
+    # Runner が Policy で弾いているが、書き出す側でも確かめる。
+    # build フェーズは root で走るので、ここを抜けられると影響が大きい。
+    def resolve_within(dir, path)
+      base = File.realpath(dir)
+      resolved = File.expand_path(path, base)
+      unless resolved.start_with?("#{base}/")
+        raise PolicyRejected, "path escapes the context: #{path}"
+      end
+
+      resolved
     end
 
     def tail(text)
