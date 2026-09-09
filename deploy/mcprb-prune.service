@@ -1,0 +1,11 @@
+[Unit]
+Description=mcprb image prune
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=mcprb
+SupplementaryGroups=docker
+WorkingDirectory=/opt/mcprb
+ExecStart=/usr/bin/ruby /opt/mcprb/bin/prune --config /etc/mcprb/config.yml

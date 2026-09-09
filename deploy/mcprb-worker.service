@@ -1,0 +1,43 @@
+[Unit]
+Description=mcprb worker (Ruby exec MCP)
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=mcprb
+SupplementaryGroups=docker
+WorkingDirectory=/opt/mcprb
+ExecStart=/usr/bin/ruby /opt/mcprb/bin/worker --config /etc/mcprb/config.yml
+
+# トークンは環境変数に置かない。/proc/PID/environ にも systemctl show にも出ない
+LoadCredential=api_token:/etc/mcprb/token
+
+# 異常終了するとジョブコンテナが残る。label で回収する
+# systemd はコマンド置換をしないので sh を挟む
+ExecStartPre=-/bin/sh -c 'docker ps -aq --filter label=mcprb.job | xargs -r docker rm --force --volumes'
+ExecStopPost=-/bin/sh -c 'docker ps -aq --filter label=mcprb.job | xargs -r docker rm --force --volumes'
+
+# SIGTERM を受けたワーカーは実行中のコンテナを片付けてから終わる。
+# ここが短いと、リースが切れるまでジョブが宙吊りになる
+TimeoutStopSec=90
+Restart=always
+RestartSec=5
+
+RuntimeDirectory=mcprb
+StateDirectory=mcprb
+
+# 注意: SupplementaryGroups=docker は実質 root。docker socket に触れる時点で
+# unit のハードニング項目は大半が意味を失う。実際の隔離境界は VM であって、この unit ではない
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+
+# ジョブコンテナは dockerd 側の cgroup に属するので、ここの MemoryMax は
+# ワーカー自身にしか効かない。コンテナの制限は docker run のフラグで行う
+MemoryMax=1G
+
+[Install]
+WantedBy=multi-user.target
