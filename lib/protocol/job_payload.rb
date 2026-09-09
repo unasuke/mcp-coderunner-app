@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "time"
+require "protocol/constants"
 
 module Protocol
   # /lease が返すジョブ 1 件。ワーカーはこれを受け取って実行する。
@@ -11,11 +12,13 @@ module Protocol
     ContextFile = Data.define(:path, :content, :executable)
     Blueprint = Data.define(:digest, :dockerfile, :files)
 
-    attr_reader :job_id, :lease_token, :lease_expires_at, :blueprint, :script, :profile, :entrypoint, :limits
+    attr_reader :job_id, :lease_id, :lease_token, :lease_expires_at, :blueprint, :script, :profile,
+      :entrypoint, :limits
 
     def self.from_h(hash)
       new(
         job_id: fetch!(hash, "job_id"),
+        lease_id: fetch!(hash, "lease_id"),
         lease_token: fetch!(hash, "lease_token"),
         lease_expires_at: Time.iso8601(fetch!(hash, "lease_expires_at")),
         blueprint: build_blueprint(fetch!(hash, "blueprint")),
@@ -52,8 +55,10 @@ module Protocol
     end
     private_class_method :build_blueprint, :symbolize
 
-    def initialize(job_id:, lease_token:, lease_expires_at:, blueprint:, script:, profile:, entrypoint:, limits:)
+    def initialize(job_id:, lease_id:, lease_token:, lease_expires_at:, blueprint:, script:, profile:,
+                   entrypoint:, limits:)
       @job_id = job_id
+      @lease_id = lease_id
       @lease_token = lease_token
       @lease_expires_at = lease_expires_at
       @blueprint = blueprint
