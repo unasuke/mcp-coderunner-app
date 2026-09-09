@@ -1,29 +1,35 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title><%= content_for(:title) || "Mcp Sandbox App" %></title>
+    <title><%= content_for(:title) || "mcprb" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="application-name" content="Mcp Sandbox App">
-    <meta name="mobile-web-app-capable" content="yes">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
 
     <%= yield :head %>
 
-    <%# Enable PWA manifest for installable apps (make sure to enable in config/routes.rb too!) %>
-    <%#= tag.link rel: "manifest", href: pwa_manifest_path(format: :json) %>
-
     <link rel="icon" href="/icon.png" type="image/png">
-    <link rel="icon" href="/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icon.png">
-
-    <%# Includes all stylesheet files in app/assets/stylesheets %>
     <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
     <%= javascript_include_tag "application", "data-turbo-track": "reload", type: "module" %>
   </head>
 
   <body>
-    <%= yield %>
+    <nav>
+      <%= link_to "jobs", admin_jobs_path %>
+      <%= link_to "blueprints", admin_blueprints_path %>
+      <%= link_to "users", admin_users_path %>
+      <%= link_to "workers", admin_workers_path %>
+      <% if Current.user %>
+        <span><%= Current.user.login %> (<%= Current.user.role %>)</span>
+        <%= button_to "ログアウト", logout_path, method: :delete %>
+      <% end %>
+    </nav>
+
+    <% if flash[:notice] %><p class="notice"><%= flash[:notice] %></p><% end %>
+    <% if flash[:alert] %><p class="alert"><%= flash[:alert] %></p><% end %>
+
+    <main><%= yield %></main>
   </body>
 </html>

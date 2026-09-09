@@ -1,0 +1,61 @@
+<h1>Job #<%= @job.id %></h1>
+
+<dl>
+  <dt>state</dt><dd><%= @job.state %></dd>
+  <dt>profile</dt><dd><%= @job.profile %></dd>
+  <dt>blueprint</dt>
+  <dd><%= link_to @job.blueprint.name, admin_blueprint_path(@job.blueprint) %> (<%= @job.blueprint.state %>)</dd>
+  <dt>投入</dt><dd><%= @job.requested_by&.login %> / <%= @job.oauth_application&.name %></dd>
+  <dt>entrypoint</dt><dd><code><%= @job.entrypoint_or_default.join(" ") %></code></dd>
+  <% if @job.cancel_requested? %>
+    <dt>中断要求</dt><dd><%= @job.cancel_requested_at %></dd>
+  <% end %>
+</dl>
+
+<h2>script</h2>
+<% if @job.purged? %>
+  <p>保持期間を過ぎたため削除されました（<%= @job.purged_at %>）</p>
+<% else %>
+  <pre><%= @job.script %></pre>
+<% end %>
+
+<% if @result %>
+  <h2>結果</h2>
+  <dl>
+    <dt>termination_reason</dt><dd><%= @result.termination_reason %></dd>
+    <dt>exit_code</dt><dd><%= @result.exit_code %></dd>
+    <dt>時間</dt>
+    <dd><%= @result.duration_ms %>ms (cpu <%= @result.cpu_time_ms %>ms) / rss <%= @result.max_rss_bytes %></dd>
+    <dt>applied_limits</dt><dd><code><%= @result.applied_limits.inspect %></code></dd>
+    <dt>image</dt><dd><code><%= @result.image_digest %></code></dd>
+    <dt>worker</dt><dd><%= @result.worker_id %></dd>
+  </dl>
+
+  <h3>stdout<%= " (truncated)" if @result.truncated %></h3>
+  <pre><%= @result.stdout %></pre>
+  <h3>stderr</h3>
+  <pre><%= @result.stderr %></pre>
+<% end %>
+
+<h2>leases (<%= @leases.size %> 回)</h2>
+<table>
+  <thead><tr><th>id</th><th>instance</th><th>期限</th><th>解放</th><th>理由</th></tr></thead>
+  <tbody>
+    <% @leases.each do |lease| %>
+      <tr>
+        <td><%= lease.id %></td>
+        <td><code><%= lease.instance_id.first(8) %></code></td>
+        <td><%= lease.expires_at %></td>
+        <td><%= lease.released_at %></td>
+        <td><%= lease.release_reason %></td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>
+
+<% if @job.approvable? %>
+  <%= form_with url: approve_admin_job_path(@job), method: :post do %><%= submit_tag "承認" %><% end %>
+  <%= form_with url: reject_admin_job_path(@job), method: :post do %><%= submit_tag "却下" %><% end %>
+<% elsif @job.cancellable? %>
+  <%= form_with url: cancel_admin_job_path(@job), method: :post do %><%= submit_tag "中断" %><% end %>
+<% end %>

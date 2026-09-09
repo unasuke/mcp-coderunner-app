@@ -1,0 +1,8 @@
+<h1>承認待ち</h1>
+
+<p>
+  <%= current_user&.login %> としてログインしています。
+  管理者が承認するまで、この先には進めません。
+</p>
+
+<%= button_to "ログアウト", logout_path, method: :delete %>

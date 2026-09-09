@@ -1,0 +1,20 @@
+<h1>Blueprints</h1>
+
+<table>
+  <thead>
+    <tr><th>id</th><th>name</th><th>summary</th><th>state</th><th>digest</th><th>提案者</th><th>作成</th></tr>
+  </thead>
+  <tbody>
+    <% @blueprints.each do |blueprint| %>
+      <tr>
+        <td><%= link_to blueprint.id, admin_blueprint_path(blueprint) %></td>
+        <td><%= blueprint.name %></td>
+        <td><%= blueprint.summary %></td>
+        <td><%= blueprint.state %></td>
+        <td><code><%= blueprint.digest.first(12) %></code></td>
+        <td><%= blueprint.created_by&.login %></td>
+        <td><%= blueprint.created_at %></td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>

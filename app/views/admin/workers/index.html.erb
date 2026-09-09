@@ -1,0 +1,51 @@
+<h1>Workers</h1>
+
+<p>サーバー側の commit: <code><%= @server_commit %></code></p>
+
+<h2>資格情報</h2>
+<table>
+  <thead><tr><th>worker_id</th><th>失効</th><th></th></tr></thead>
+  <tbody>
+    <% @workers.each do |worker| %>
+      <tr>
+        <td><%= worker.worker_id %></td>
+        <td><%= worker.revoked_at %></td>
+        <td>
+          <% unless worker.revoked? %>
+            <%= button_to "失効", revoke_admin_worker_path(worker), method: :post %>
+          <% end %>
+        </td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>
+
+<%= form_with url: admin_workers_path, method: :post do |form| %>
+  <%= form.text_field :worker_id, placeholder: "home-vm-01" %>
+  <%= submit_tag "トークンを発行" %>
+<% end %>
+
+<h2>起動中のインスタンス</h2>
+<table>
+  <thead>
+    <tr><th>instance</th><th>worker</th><th>最終 heartbeat</th><th>busy/capacity</th><th>commit</th><th>ruby</th><th>docker</th></tr>
+  </thead>
+  <tbody>
+    <% @processes.each do |process| %>
+      <tr>
+        <td><code><%= process.instance_id.first(8) %></code></td>
+        <td><%= process.worker_id %></td>
+        <td><%= process.last_heartbeat_at %><%= " (stale)" unless process.alive? %></td>
+        <td><%= process.busy %>/<%= process.capacity %></td>
+        <td>
+          <code><%= process.commit_hash.first(8) %></code>
+          <% if process.commit_hash != @server_commit %>
+            <strong>サーバーとずれています。VM で git pull して systemctl restart mcprb-worker してください</strong>
+          <% end %>
+        </td>
+        <td><%= process.ruby_version %></td>
+        <td><%= process.docker_version %></td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>

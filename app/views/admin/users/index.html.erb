@@ -1,0 +1,19 @@
+<h1>Users</h1>
+
+<table>
+  <thead><tr><th>login</th><th>role</th><th>承認</th><th></th></tr></thead>
+  <tbody>
+    <% @users.each do |user| %>
+      <tr>
+        <td><%= user.login %></td>
+        <td><%= user.role %></td>
+        <td><%= user.approved_by&.login %> <%= user.approved_at %></td>
+        <td>
+          <% User.roles.keys.reject { |role| role == user.role }.each do |role| %>
+            <%= button_to role, admin_user_path(user, role:), method: :patch %>
+          <% end %>
+        </td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>

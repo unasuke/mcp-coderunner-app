@@ -6,7 +6,9 @@ class JobResult < ApplicationRecord
 
   enum :termination_reason, REASONS.index_by(&:itself)
 
-  validates :applied_limits, presence: true
+  # 空のハッシュは許す。コンテナが走っていない終了理由（image_build_failed など）では
+  # 適用した値が無い。null だけ DB の not null で防ぐ
+  validates :applied_limits, exclusion: { in: [ nil ] }
 
   def succeeded?
     exited? && exit_code&.zero?

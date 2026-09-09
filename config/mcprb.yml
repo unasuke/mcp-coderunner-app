@@ -28,6 +28,10 @@ shared:
   # ワーカーとのずれを検知するための実装のリビジョン
   commit_hash: development
 
+  # GitHub ログイン。read:user だけ要求する
+  github_client_id: <%= ENV["GITHUB_CLIENT_ID"] %>
+  github_client_secret: <%= ENV["GITHUB_CLIENT_SECRET"] %>
+
 # config_for が shared を各環境にマージする
 development:
 

@@ -1,0 +1,42 @@
+<h1>Blueprint #<%= @blueprint.id %> <%= @blueprint.name %></h1>
+
+<p><%= @blueprint.summary %></p>
+
+<dl>
+  <dt>state</dt><dd><%= @blueprint.state %></dd>
+  <dt>digest</dt><dd><code><%= @blueprint.digest %></code></dd>
+  <dt>提案者</dt><dd><%= @blueprint.created_by&.login %> / <%= @blueprint.oauth_application&.name %></dd>
+  <dt>レビュー</dt><dd><%= @blueprint.reviewed_by&.login %> <%= @blueprint.reviewed_at %> <%= @blueprint.review_note %></dd>
+  <% if @parent %>
+    <dt>改訂元</dt><dd><%= link_to "##{@parent.id}", admin_blueprint_path(@parent) %></dd>
+  <% end %>
+</dl>
+
+<h2>Dockerfile</h2>
+<pre><%= @blueprint.dockerfile %></pre>
+
+<% if @parent %>
+  <h2>前の版の Dockerfile</h2>
+  <pre><%= @parent.dockerfile %></pre>
+<% end %>
+
+<h2>context (<%= @blueprint.blueprint_files.size %> ファイル / <%= @blueprint.context_bytes %> バイト)</h2>
+<% @blueprint.blueprint_files.each do |file| %>
+  <h3><%= file.path %><%= " (executable)" if file.executable %></h3>
+  <pre><%= file.content %></pre>
+<% end %>
+
+<h2>レビュー</h2>
+<%= form_with url: approve_admin_blueprint_path(@blueprint), method: :post do %>
+  <%= submit_tag "承認" %>
+<% end %>
+
+<%= form_with url: reject_admin_blueprint_path(@blueprint), method: :post do |form| %>
+  <%= form.text_field :review_note, placeholder: "却下の理由" %>
+  <%= submit_tag "却下" %>
+<% end %>
+
+<%= form_with url: revoke_admin_blueprint_path(@blueprint), method: :post do |form| %>
+  <%= form.text_field :review_note, placeholder: "失効の理由" %>
+  <%= submit_tag "失効" %>
+<% end %>

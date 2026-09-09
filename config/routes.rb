@@ -1,6 +1,43 @@
 Rails.application.routes.draw do
   use_doorkeeper
 
+  # OAuth のメタデータと動的クライアント登録（Doorkeeper が持っていない分）
+  get ".well-known/oauth-protected-resource" => "well_known#protected_resource"
+  get ".well-known/oauth-authorization-server" => "well_known#authorization_server"
+  post "oauth/register" => "oauth/registrations#create"
+
+  # GitHub ログイン
+  get "login" => "sessions#new", as: :login
+  post "auth/github", as: :github_auth
+  get "auth/github/callback" => "sessions#create"
+  get "auth/failure" => "sessions#failure"
+  delete "logout" => "sessions#destroy", as: :logout
+  get "pending" => "sessions#pending", as: :pending
+
+  namespace :admin do
+    resources :blueprints, only: [ :index, :show ] do
+      member do
+        post :approve
+        post :reject
+        post :revoke
+      end
+    end
+
+    resources :jobs, only: [ :index, :show ] do
+      member do
+        post :approve
+        post :reject
+        post :cancel
+      end
+    end
+
+    resources :users, only: [ :index, :update ]
+
+    resources :workers, only: [ :index, :create ] do
+      member { post :revoke }
+    end
+  end
+
   # MCP のリソースサーバー本体。Anthropic のレンジからのみ到達できる（Caddy 側で絞る）
   post "mcp" => "mcp#create", as: :mcp
 
@@ -26,6 +63,5 @@ Rails.application.routes.draw do
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
 
-  # Defines the root path route ("/")
-  # root "posts#index"
+  root "admin/jobs#index"
 end
