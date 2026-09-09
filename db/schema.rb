@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_09_104408) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_09_142850) do
   create_table "blueprint_files", force: :cascade do |t|
     t.integer "blueprint_id", null: false
     t.text "content", null: false
@@ -98,6 +98,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_09_104408) do
 
   create_table "oauth_access_grants", force: :cascade do |t|
     t.integer "application_id", null: false
+    t.string "code_challenge"
+    t.string "code_challenge_method"
     t.datetime "created_at", null: false
     t.integer "expires_in", null: false
     t.text "redirect_uri", null: false

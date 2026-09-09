@@ -37,4 +37,9 @@ class McpController < ActionController::API
 
     { json: { error: "unauthorized", message: error&.description } }
   end
+
+  # スコープ不足。API なので HTML のエラーページではなく JSON で返す
+  def doorkeeper_forbidden_render_options(error: nil)
+    { json: { error: "forbidden", message: error&.description } }
+  end
 end

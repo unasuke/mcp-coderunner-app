@@ -37,8 +37,12 @@ class ApplicationController < ActionController::Base
     require_member! || head(:forbidden)
   end
 
-  # Doorkeeper の resource_owner_authenticator から呼ばれる
-  def current_user_for_oauth
-    current_user if current_user&.can_use_mcp?
+  # Doorkeeper の resource_owner_authenticator から呼ばれる。
+  # 認可できないときはリダイレクトして nil を返すと、Doorkeeper がそこで止まる。
+  def authenticate_resource_owner_for_oauth
+    return current_user if current_user&.can_use_mcp?
+
+    require_member!
+    nil
   end
 end

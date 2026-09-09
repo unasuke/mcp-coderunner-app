@@ -6,6 +6,7 @@ class WellKnownController < ActionController::API
     render json: {
       resource: url_for_path("/mcp"),
       authorization_servers: [ issuer ],
+      scopes_supported: Doorkeeper.config.default_scopes.to_a,
       bearer_methods_supported: [ "header" ],
       resource_name: McpServerBuilder::NAME
     }
@@ -19,6 +20,7 @@ class WellKnownController < ActionController::API
       token_endpoint: url_for_path("/oauth/token"),
       registration_endpoint: url_for_path("/oauth/register"),
       revocation_endpoint: url_for_path("/oauth/revoke"),
+      scopes_supported: Doorkeeper.config.default_scopes.to_a,
       response_types_supported: [ "code" ],
       grant_types_supported: %w[authorization_code refresh_token],
       code_challenge_methods_supported: [ "S256" ],

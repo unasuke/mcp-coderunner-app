@@ -7,7 +7,8 @@ class McpTest < ActionDispatch::IntegrationTest
       name: "claude", redirect_uri: "https://claude.ai/api/mcp/auth_callback", confidential: false
     )
     @token = Doorkeeper::AccessToken.create!(
-      application: @application, resource_owner_id: @user.id, expires_in: 900, scopes: ""
+      application: @application, resource_owner_id: @user.id, expires_in: 900,
+      scopes: Doorkeeper.config.default_scopes.to_s
     )
   end
 
@@ -168,7 +169,21 @@ class McpTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_equal [ "S256" ], response.parsed_body["code_challenge_methods_supported"]
+    assert_equal [ "mcp" ], response.parsed_body["scopes_supported"]
     assert_equal "http://mcprb.invalid/oauth/register", response.parsed_body["registration_endpoint"]
+  end
+
+  # 既定スコープを満たさないトークンは 403 を JSON で返す（HTML のエラーページにしない）
+  test "a token without the scope is forbidden" do
+    scopeless = Doorkeeper::AccessToken.create!(
+      application: @application, resource_owner_id: @user.id, expires_in: 900, scopes: ""
+    )
+
+    post "/mcp", headers: { "Authorization" => "Bearer #{scopeless.token}" }, as: :json,
+      params: { jsonrpc: "2.0", id: 1, method: "tools/list" }
+
+    assert_response :forbidden
+    assert_equal "forbidden", response.parsed_body["error"]
   end
 
   test "dynamic client registration issues a public client" do
@@ -178,6 +193,7 @@ class McpTest < ActionDispatch::IntegrationTest
 
     assert_response :created
     assert_equal "none", response.parsed_body["token_endpoint_auth_method"]
+    assert_equal "mcp", response.parsed_body["scope"]
     assert_predicate Doorkeeper::Application.find_by(uid: response.parsed_body["client_id"]), :present?
   end
 

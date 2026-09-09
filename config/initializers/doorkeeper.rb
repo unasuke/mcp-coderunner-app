@@ -21,11 +21,10 @@ Doorkeeper.configure do
   # See: https://guides.rubyonrails.org/active_record_multiple_databases.html#activating-automatic-role-switching
 
   # This block will be called to check whether the resource owner is authenticated or not.
+  # /oauth/authorize はブラウザで開かれる。ここが唯一の実質的な関門。
+  # DCR 自体に認証は無いが、認可コードは member 以上のセッションからしか出ない。
   resource_owner_authenticator do
-    raise "Please configure doorkeeper resource_owner_authenticator block located in #{__FILE__}"
-    # Put your resource owner authentication logic here.
-    # Example implementation:
-    #   User.find_by(id: session[:user_id]) || redirect_to(new_user_session_url)
+    authenticate_resource_owner_for_oauth
   end
 
   # If you didn't skip applications controller from Doorkeeper routes in your application routes.rb
@@ -261,6 +260,10 @@ Doorkeeper.configure do
   # For more information go to
   # https://doorkeeper.gitbook.io/guides/ruby-on-rails/scopes
   #
+  # スコープは 1 つだけ持つ。クライアントが scope を送ってこなくても認可を通したいので、
+  # 既定スコープとして宣言しておく（無いと "Missing required parameter: scope." で弾かれる）。
+  default_scopes :mcp
+
   # default_scopes  :public
   # optional_scopes :write, :update
 
@@ -311,6 +314,10 @@ Doorkeeper.configure do
   # #call can be used in order to allow conditional checks (to allow non-SSL
   # redirects to localhost for example).
   #
+  # ループバックだけ平文を許す。RFC 8252 のネイティブアプリと同じ扱いで、
+  # MCP Inspector のコールバック（http://localhost:6274/...）がここに当たる。
+  # Oauth::RegistrationsController の検証と同じ基準にしておく（環境では分けない）。
+  force_ssl_in_redirect_uri { |uri| ![ "localhost", "127.0.0.1", "::1" ].include?(uri.host) }
   # force_ssl_in_redirect_uri !Rails.env.development?
   #
   # force_ssl_in_redirect_uri { |uri| uri.host != 'localhost' }
