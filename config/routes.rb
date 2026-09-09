@@ -2,8 +2,10 @@ Rails.application.routes.draw do
   use_doorkeeper
 
   # OAuth のメタデータと動的クライアント登録（Doorkeeper が持っていない分）
-  get ".well-known/oauth-protected-resource" => "well_known#protected_resource"
-  get ".well-known/oauth-authorization-server" => "well_known#authorization_server"
+  # クライアントによってはリソースのパスを後ろに付けて引きに来る（RFC 9728 の
+  # /.well-known/oauth-protected-resource/mcp 形式）。どちらでも同じものを返す
+  get ".well-known/oauth-protected-resource(/*resource)" => "well_known#protected_resource"
+  get ".well-known/oauth-authorization-server(/*resource)" => "well_known#authorization_server"
   post "oauth/register" => "oauth/registrations#create"
 
   # GitHub ログイン
@@ -40,6 +42,7 @@ Rails.application.routes.draw do
 
   # MCP のリソースサーバー本体。Anthropic のレンジからのみ到達できる（Caddy 側で絞る）
   post "mcp" => "mcp#create", as: :mcp
+  match "mcp" => "mcp#unsupported", via: [ :get, :delete ]
 
   # ワーカーから。すべてワーカー発の HTTPS
   namespace :api do

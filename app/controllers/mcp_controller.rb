@@ -16,6 +16,13 @@ class McpController < ActionController::API
     end
   end
 
+  # SSE のストリームは提供しない。仕様上、その場合は 405 を返す必要がある。
+  # ここでのセッションは持たない（stateless）ので、DELETE での終了も無い。
+  def unsupported
+    headers["Allow"] = "POST"
+    render json: { error: "method_not_allowed" }, status: :method_not_allowed
+  end
+
   private
 
   def set_current

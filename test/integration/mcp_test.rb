@@ -181,6 +181,31 @@ class McpTest < ActionDispatch::IntegrationTest
     assert_predicate Doorkeeper::Application.find_by(uid: response.parsed_body["client_id"]), :present?
   end
 
+  # SSE のストリームは提供しないので 405（仕様上の MUST）
+  test "GET and DELETE on the endpoint are refused with 405" do
+    get "/mcp", headers: { "Authorization" => "Bearer #{@token.token}" }
+
+    assert_response :method_not_allowed
+    assert_equal "POST", response.headers["Allow"]
+
+    delete "/mcp", headers: { "Authorization" => "Bearer #{@token.token}" }
+
+    assert_response :method_not_allowed
+  end
+
+  # クライアントによってはリソースのパスを後ろに付けて引きに来る
+  test "the resource metadata also answers under the resource path" do
+    get "/.well-known/oauth-protected-resource/mcp"
+
+    assert_response :success
+    assert_equal "http://mcprb.invalid/mcp", response.parsed_body["resource"]
+
+    get "/.well-known/oauth-authorization-server/mcp"
+
+    assert_response :success
+    assert_equal "http://mcprb.invalid", response.parsed_body["issuer"]
+  end
+
   test "dynamic client registration refuses a plaintext redirect_uri" do
     post "/oauth/register", as: :json, params: { redirect_uris: [ "http://evil.invalid/cb" ] }
 

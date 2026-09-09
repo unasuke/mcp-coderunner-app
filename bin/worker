@@ -175,8 +175,11 @@ module Worker
       result.success? ? result.stdout.strip : nil
     end
 
+    # 空のファイルや読めないパスでも register は通す。ずれの検知が効かなくなるだけで、
+    # ワーカーが起動できないほどのことではない
     def read_revision(path)
-      File.read(path).strip
+      revision = File.read(path).strip
+      revision.empty? ? "unknown" : revision
     rescue SystemCallError
       "unknown"
     end
