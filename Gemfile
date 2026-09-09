@@ -17,6 +17,16 @@ gem "stimulus-rails"
 # Build JSON APIs with ease [https://github.com/rails/jbuilder]
 gem "jbuilder"
 
+# MCP server implementation [https://github.com/modelcontextprotocol/ruby-sdk]
+gem "mcp"
+
+# OAuth 2 provider. MCP のアクセストークンを発行する
+gem "doorkeeper"
+
+# GitHub ログイン。/oauth/authorize の関門はここを通ったセッションで判定する
+gem "omniauth-github"
+gem "omniauth-rails_csrf_protection"
+
 # Use Active Model has_secure_password [https://guides.rubyonrails.org/active_model_basics.html#securepassword]
 # gem "bcrypt", "~> 3.1.7"
 
