@@ -28,10 +28,10 @@
               <td><%= link_to blueprint.id, admin_blueprint_path(blueprint), class: "mono" %></td>
               <td><%= link_to blueprint.name, admin_blueprint_path(blueprint) %></td>
               <td><%= blueprint.summary %></td>
-              <td><%= state_tag(blueprint.state) %></td>
+              <td class="nowrap"><%= state_tag(blueprint.state) %></td>
               <td><%= short(blueprint.digest) %></td>
               <td class="num dim"><%= blueprint.blueprint_files.size %> ファイル</td>
-              <td class="dim"><%= blueprint.created_by&.login %> <%= since(blueprint.created_at) %></td>
+              <td class="dim nowrap"><%= blueprint.created_by&.login %> <%= since(blueprint.created_at) %></td>
             </tr>
           <% end %>
         </tbody>

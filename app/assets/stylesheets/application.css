@@ -88,11 +88,12 @@ a:hover { text-decoration-thickness: 2px; }
   margin-right: var(--step);
 }
 
-.bar nav { display: flex; gap: calc(var(--step) * 2); flex: 1; }
+.bar nav { display: flex; flex-wrap: wrap; gap: calc(var(--step) * 2); flex: 1; }
 
 .bar nav a {
   color: var(--ink-soft);
   text-decoration: none;
+  white-space: nowrap;
   padding-bottom: 2px;
   border-bottom: 2px solid transparent;
 }
@@ -167,7 +168,7 @@ h3 { font-size: 0.85rem; font-weight: 600; color: var(--ink-soft); margin: calc(
 
 .facts { display: grid; grid-template-columns: max-content 1fr; gap: calc(var(--step) * 0.75) calc(var(--step) * 3); margin: 0; }
 .facts dt { color: var(--ink-faint); font-size: 13px; }
-.facts dd { margin: 0; }
+.facts dd { margin: 0; overflow-wrap: anywhere; }
 
 /* ---- コードとログ ---- */
 
@@ -215,10 +216,13 @@ h3 { font-size: 0.85rem; font-weight: 600; color: var(--ink-soft); margin: calc(
 /* ---- 操作 ---- */
 
 .actions { display: flex; flex-wrap: wrap; gap: var(--step); align-items: flex-start; margin-top: calc(var(--step) * 2); }
+/* 表の中の操作は折り返さない。狭い画面では表ごと横に流す */
+.rows .actions { flex-wrap: nowrap; margin: 0; }
 .actions form { display: flex; gap: var(--step); align-items: center; }
 
 button, input[type="submit"] {
   font: inherit;
+  white-space: nowrap;
   font-size: 14px;
   padding: calc(var(--step) * 0.7) calc(var(--step) * 1.75);
   background: var(--field);
@@ -238,7 +242,7 @@ input[type="text"] {
   background: var(--field);
   color: var(--ink);
   border: 1px solid var(--rule-firm);
-  min-width: 16rem;
+  min-width: min(16rem, 100%);
 }
 
 /* ---- 通知 ---- */
@@ -270,10 +274,23 @@ p.warn { background: var(--stop-wash); border-left: 3px solid var(--stop); paddi
 .gate hr { border: 0; border-top: 1px solid var(--rule); margin: calc(var(--step) * 4) 0; }
 
 @media (max-width: 40rem) {
-  .bar { padding: var(--step) calc(var(--step) * 2); }
+  /* 横に並べきれないので、識別・移動・状態の 3 段に積む */
+  .bar {
+    display: grid;
+    gap: var(--step);
+    padding: var(--step) calc(var(--step) * 2);
+  }
+  .bar-mark { margin: 0; }
+  .bar nav { gap: calc(var(--step) * 1.5); }
+  .bar-side { justify-content: space-between; }
+
   main { padding: calc(var(--step) * 3) calc(var(--step) * 2) calc(var(--step) * 6); }
-  .facts { grid-template-columns: 1fr; gap: 0 0; }
+
+  .facts { grid-template-columns: 1fr; gap: 0; }
   .facts dd { margin-bottom: var(--step); }
+
+  h1 { font-size: 1.3rem; }
+  .lines li { grid-template-columns: 2.4rem 1fr; gap: var(--step); }
 }
 
 /* ---- Rouge のトークン。配色は本体のパレットから引く ---- */

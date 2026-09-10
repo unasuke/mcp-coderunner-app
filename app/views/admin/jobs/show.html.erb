@@ -115,7 +115,8 @@
   <% end %>
 
   <h2>リース <span class="dim"><%= @leases.size %> 回の試行</span></h2>
-  <table class="rows">
+  <div class="rows-scroll">
+    <table class="rows">
     <thead>
       <tr><th>#</th><th>インスタンス</th><th>期限</th><th>解放</th><th>理由</th></tr>
     </thead>
@@ -130,7 +131,8 @@
         </tr>
       <% end %>
     </tbody>
-  </table>
+    </table>
+  </div>
 
   <div class="actions">
     <% if @job.approvable? %>

@@ -27,13 +27,13 @@
           <% @jobs.each do |job| %>
             <tr class="<%= "needs-review" if job.pending_review? %>">
               <td><%= link_to job.id, admin_job_path(job), class: "mono" %></td>
-              <td><%= state_tag(job.state) %></td>
-              <td><%= outcome_tag(job.job_result) %></td>
+              <td class="nowrap"><%= state_tag(job.state) %></td>
+              <td class="nowrap"><%= outcome_tag(job.job_result) %></td>
               <td class="num mono"><%= job.job_result&.exit_code %></td>
               <td class="num mono"><%= number_with_delimiter(job.job_result&.duration_ms) %></td>
-              <td><%= link_to job.blueprint.name, admin_blueprint_path(job.blueprint) %></td>
-              <td><%= job.profile %></td>
-              <td class="dim"><%= since(job.created_at) %></td>
+              <td class="nowrap"><%= link_to job.blueprint.name, admin_blueprint_path(job.blueprint) %></td>
+              <td class="nowrap"><%= job.profile %></td>
+              <td class="dim nowrap"><%= since(job.created_at) %></td>
             </tr>
           <% end %>
         </tbody>

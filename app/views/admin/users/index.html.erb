@@ -9,14 +9,15 @@
     <code class="mono">admin</code> にするとこの管理画面も開けます。
   </p>
 
-  <table class="rows">
+  <div class="rows-scroll">
+    <table class="rows">
     <thead>
       <tr><th>GitHub</th><th>ロール</th><th>承認</th><th>操作</th></tr>
     </thead>
     <tbody>
       <% @users.each do |user| %>
         <tr class="<%= "needs-review" if user.pending? %>">
-          <td>
+          <td class="nowrap">
             <%= user.login %>
             <% if user.name.present? && user.name != user.login %>
               <span class="dim"><%= user.name %></span>
@@ -42,5 +43,6 @@
         </tr>
       <% end %>
     </tbody>
-  </table>
+    </table>
+  </div>
 </div>

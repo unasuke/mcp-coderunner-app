@@ -63,14 +63,15 @@
 
   <h2>資格情報</h2>
 
-  <table class="rows">
+  <div class="rows-scroll">
+    <table class="rows">
     <thead>
       <tr><th>worker_id</th><th>状態</th><th>発行</th><th>操作</th></tr>
     </thead>
     <tbody>
       <% @workers.each do |worker| %>
         <tr>
-          <td class="mono"><%= worker.worker_id %></td>
+          <td class="mono nowrap"><%= worker.worker_id %></td>
           <td class="nowrap">
             <% if worker.revoked? %>
               <span class="state state-stop">失効 <%= since(worker.revoked_at) %></span>
@@ -91,7 +92,8 @@
         <tr><td colspan="4" class="dim">まだ発行していません。</td></tr>
       <% end %>
     </tbody>
-  </table>
+    </table>
+  </div>
 
   <h2>トークンを発行する</h2>
   <p class="dim">平文はこの画面に一度だけ出ます。保存されるのはハッシュだけなので、閉じたら再発行になります。</p>
