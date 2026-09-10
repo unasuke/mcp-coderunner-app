@@ -1,61 +1,143 @@
-<h1>Job #<%= @job.id %></h1>
+<% content_for :title, "ジョブ ##{@job.id}" %>
 
-<dl>
-  <dt>state</dt><dd><%= @job.state %></dd>
-  <dt>profile</dt><dd><%= @job.profile %></dd>
-  <dt>blueprint</dt>
-  <dd><%= link_to @job.blueprint.name, admin_blueprint_path(@job.blueprint) %> (<%= @job.blueprint.state %>)</dd>
-  <dt>投入</dt><dd><%= @job.requested_by&.login %> / <%= @job.oauth_application&.name %></dd>
-  <dt>entrypoint</dt><dd><code><%= @job.entrypoint_or_default.join(" ") %></code></dd>
-  <% if @job.cancel_requested? %>
-    <dt>中断要求</dt><dd><%= @job.cancel_requested_at %></dd>
+<% unless @job.finished? || @job.rejected? %>
+  <% content_for :head do %>
+    <meta http-equiv="refresh" content="5">
   <% end %>
-</dl>
-
-<h2>script</h2>
-<% if @job.purged? %>
-  <p>保持期間を過ぎたため削除されました（<%= @job.purged_at %>）</p>
-<% else %>
-  <pre><%= @job.script %></pre>
 <% end %>
 
-<% if @result %>
-  <h2>結果</h2>
-  <dl>
-    <dt>termination_reason</dt><dd><%= @result.termination_reason %></dd>
-    <dt>exit_code</dt><dd><%= @result.exit_code %></dd>
-    <dt>時間</dt>
-    <dd><%= @result.duration_ms %>ms (cpu <%= @result.cpu_time_ms %>ms) / rss <%= @result.max_rss_bytes %></dd>
-    <dt>applied_limits</dt><dd><code><%= @result.applied_limits.inspect %></code></dd>
-    <dt>image</dt><dd><code><%= @result.image_digest %></code></dd>
-    <dt>worker</dt><dd><%= @result.worker_id %></dd>
+<div class="sheet">
+  <h1>ジョブ #<%= @job.id %> <span class="h1-sub"><%= state_tag(@job.state) %></span></h1>
+
+  <dl class="facts">
+    <dt>実行環境</dt>
+    <dd>
+      <%= link_to @job.blueprint.name, admin_blueprint_path(@job.blueprint) %>
+      <%= state_tag(@job.blueprint.state) %>
+      <%= short(@job.blueprint.digest) %>
+    </dd>
+
+    <dt>プロファイル</dt>
+    <dd><%= @job.profile %></dd>
+
+    <dt>起動コマンド</dt>
+    <dd class="mono"><%= @job.entrypoint_or_default.join(" ") %></dd>
+
+    <dt>投入</dt>
+    <dd>
+      <%= @job.requested_by&.login || "—" %>
+      <% if @job.oauth_application %>
+        <span class="dim">（<%= @job.oauth_application.name %>）</span>
+      <% end %>
+      <%= since(@job.created_at) %>
+    </dd>
+
+    <% if @job.cancel_requested? %>
+      <dt>中断</dt>
+      <dd class="warn">要求済み（<%= since(@job.cancel_requested_at) %>）。次の heartbeat でワーカーに伝わります。</dd>
+    <% end %>
   </dl>
 
-  <h3>stdout<%= " (truncated)" if @result.truncated %></h3>
-  <pre><%= @result.stdout %></pre>
-  <h3>stderr</h3>
-  <pre><%= @result.stderr %></pre>
-<% end %>
+  <% if @result %>
+    <h2>結果</h2>
+    <dl class="facts">
+      <dt>終了理由</dt>
+      <dd><%= outcome_tag(@result) %> <span class="mono">exit <%= @result.exit_code.inspect %></span></dd>
 
-<h2>leases (<%= @leases.size %> 回)</h2>
-<table>
-  <thead><tr><th>id</th><th>instance</th><th>期限</th><th>解放</th><th>理由</th></tr></thead>
-  <tbody>
-    <% @leases.each do |lease| %>
-      <tr>
-        <td><%= lease.id %></td>
-        <td><code><%= lease.instance_id.first(8) %></code></td>
-        <td><%= lease.expires_at %></td>
-        <td><%= lease.released_at %></td>
-        <td><%= lease.release_reason %></td>
-      </tr>
+      <dt>時間</dt>
+      <dd class="mono">
+        <%= number_with_delimiter(@result.duration_ms) %> ms
+        <span class="dim">（CPU <%= @result.cpu_time_ms ? "#{number_with_delimiter(@result.cpu_time_ms)} ms" : "計測なし" %>）</span>
+      </dd>
+
+      <dt>最大メモリ</dt>
+      <dd class="mono"><%= @result.max_rss_bytes ? bytes(@result.max_rss_bytes) : tag.span("計測なし", class: "dim") %></dd>
+
+      <dt>適用された制限</dt>
+      <dd class="mono"><%= @result.applied_limits.map { |k, v| "#{k}=#{v}" }.join("  ") %></dd>
+
+      <dt>イメージ</dt>
+      <dd><%= short(@result.image_digest, 24) %></dd>
+
+      <dt>ワーカー</dt>
+      <dd><%= @result.worker_id || "—" %></dd>
+    </dl>
+
+    <h2>標準出力<% if @result.truncated %> <span class="dim">（上限を超えたため中間を省略）</span><% end %></h2>
+    <div class="panel">
+      <% if @result.stdout.blank? %>
+        <pre class="dim">（出力なし）</pre>
+      <% else %>
+        <pre><%= @result.stdout %></pre>
+      <% end %>
+    </div>
+
+    <h2>標準エラー出力</h2>
+    <div class="panel">
+      <% if @result.stderr.blank? %>
+        <pre class="dim">（出力なし）</pre>
+      <% else %>
+        <pre><%= @result.stderr %></pre>
+      <% end %>
+    </div>
+  <% elsif @job.pending_review? %>
+    <h2>結果</h2>
+    <div class="empty">
+      <p>承認するまで実行されません。</p>
+      <p>プロファイルが <code class="mono">default</code> でない、スクリプトが 64KB を超える、実行環境が未承認、のいずれかに当たっています。</p>
+    </div>
+  <% else %>
+    <h2>結果</h2>
+    <div class="empty">
+      <p>まだ結果が届いていません。ワーカーが拾って実行しています。</p>
+    </div>
+  <% end %>
+
+  <h2>スクリプト</h2>
+  <% if @job.purged? %>
+    <div class="empty">
+      <p>保持期間を過ぎたため削除されました（<%= since(@job.purged_at) %>）。</p>
+    </div>
+  <% else %>
+    <div class="panel">
+      <div class="panel-head">
+        <span>/work/script.rb</span>
+        <span><%= number_to_human_size(@job.script.bytesize) %></span>
+      </div>
+      <ol class="lines">
+        <% highlight_lines(@job.script, syntax: :ruby).each do |line| %>
+          <li><span><%= line %></span></li>
+        <% end %>
+      </ol>
+    </div>
+  <% end %>
+
+  <h2>リース <span class="dim"><%= @leases.size %> 回の試行</span></h2>
+  <table class="rows">
+    <thead>
+      <tr><th>#</th><th>インスタンス</th><th>期限</th><th>解放</th><th>理由</th></tr>
+    </thead>
+    <tbody>
+      <% @leases.each do |lease| %>
+        <tr>
+          <td class="mono"><%= lease.id %></td>
+          <td><%= short(lease.instance_id, 8) %></td>
+          <td class="dim"><%= since(lease.expires_at) %></td>
+          <td class="dim"><%= lease.released_at ? since(lease.released_at) : tag.span("保持中", class: "state state-live") %></td>
+          <td><%= lease.release_reason || "—" %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <div class="actions">
+    <% if @job.approvable? %>
+      <%= button_to "承認して実行する", approve_admin_job_path(@job), class: "btn-go" %>
+      <%= button_to "却下する", reject_admin_job_path(@job), class: "btn-stop",
+            form: { data: { turbo_confirm: "このジョブを却下します。実行されません。" } } %>
+    <% elsif @job.cancellable? %>
+      <%= button_to "中断する", cancel_admin_job_path(@job), class: "btn-stop",
+            form: { data: { turbo_confirm: "実行中のコンテナを落とします。" } } %>
     <% end %>
-  </tbody>
-</table>
-
-<% if @job.approvable? %>
-  <%= form_with url: approve_admin_job_path(@job), method: :post do %><%= submit_tag "承認" %><% end %>
-  <%= form_with url: reject_admin_job_path(@job), method: :post do %><%= submit_tag "却下" %><% end %>
-<% elsif @job.cancellable? %>
-  <%= form_with url: cancel_admin_job_path(@job), method: :post do %><%= submit_tag "中断" %><% end %>
-<% end %>
+  </div>
+</div>

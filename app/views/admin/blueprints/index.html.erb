@@ -1,20 +1,41 @@
-<h1>Blueprints</h1>
+<% content_for :title, "実行環境" %>
 
-<table>
-  <thead>
-    <tr><th>id</th><th>name</th><th>summary</th><th>state</th><th>digest</th><th>提案者</th><th>作成</th></tr>
-  </thead>
-  <tbody>
-    <% @blueprints.each do |blueprint| %>
-      <tr>
-        <td><%= link_to blueprint.id, admin_blueprint_path(blueprint) %></td>
-        <td><%= blueprint.name %></td>
-        <td><%= blueprint.summary %></td>
-        <td><%= blueprint.state %></td>
-        <td><code><%= blueprint.digest.first(12) %></code></td>
-        <td><%= blueprint.created_by&.login %></td>
-        <td><%= blueprint.created_at %></td>
-      </tr>
-    <% end %>
-  </tbody>
-</table>
+<div class="sheet">
+  <h1>実行環境 <span class="h1-sub"><%= @blueprints.size %> 件</span></h1>
+
+  <% if @blueprints.empty? %>
+    <div class="empty">
+      <p>まだ実行環境がありません。</p>
+      <p>MCP クライアントから <code class="mono">propose_blueprint</code> で提案すると、ここにレビュー待ちとして並びます。</p>
+    </div>
+  <% else %>
+    <div class="rows-scroll">
+      <table class="rows">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>名前</th>
+            <th>用途</th>
+            <th>状態</th>
+            <th>digest</th>
+            <th class="num">context</th>
+            <th>提案</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @blueprints.each do |blueprint| %>
+            <tr class="<%= "needs-review" if blueprint.pending_review? %>">
+              <td><%= link_to blueprint.id, admin_blueprint_path(blueprint), class: "mono" %></td>
+              <td><%= link_to blueprint.name, admin_blueprint_path(blueprint) %></td>
+              <td><%= blueprint.summary %></td>
+              <td><%= state_tag(blueprint.state) %></td>
+              <td><%= short(blueprint.digest) %></td>
+              <td class="num dim"><%= blueprint.blueprint_files.size %> ファイル</td>
+              <td class="dim"><%= blueprint.created_by&.login %> <%= since(blueprint.created_at) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+</div>

@@ -1,42 +1,103 @@
-<h1>Blueprint #<%= @blueprint.id %> <%= @blueprint.name %></h1>
+<% content_for :title, "実行環境 #{@blueprint.name}" %>
 
-<p><%= @blueprint.summary %></p>
+<div class="sheet">
+  <h1><%= @blueprint.name %> <span class="h1-sub"><%= state_tag(@blueprint.state) %></span></h1>
 
-<dl>
-  <dt>state</dt><dd><%= @blueprint.state %></dd>
-  <dt>digest</dt><dd><code><%= @blueprint.digest %></code></dd>
-  <dt>提案者</dt><dd><%= @blueprint.created_by&.login %> / <%= @blueprint.oauth_application&.name %></dd>
-  <dt>レビュー</dt><dd><%= @blueprint.reviewed_by&.login %> <%= @blueprint.reviewed_at %> <%= @blueprint.review_note %></dd>
-  <% if @parent %>
-    <dt>改訂元</dt><dd><%= link_to "##{@parent.id}", admin_blueprint_path(@parent) %></dd>
+  <dl class="facts">
+    <dt>用途</dt>
+    <dd><%= @blueprint.summary %></dd>
+
+    <dt>digest</dt>
+    <dd class="mono"><%= @blueprint.digest %></dd>
+
+    <dt>提案</dt>
+    <dd>
+      <%= @blueprint.created_by&.login || "—" %>
+      <% if @blueprint.oauth_application %>
+        <span class="dim">（<%= @blueprint.oauth_application.name %>）</span>
+      <% end %>
+      <%= since(@blueprint.created_at) %>
+    </dd>
+
+    <% if @blueprint.reviewed_at %>
+      <dt>レビュー</dt>
+      <dd>
+        <%= @blueprint.reviewed_by&.login %> <%= since(@blueprint.reviewed_at) %>
+        <% if @blueprint.review_note.present? %><span class="dim">— <%= @blueprint.review_note %></span><% end %>
+      </dd>
+    <% end %>
+
+    <% if @parent %>
+      <dt>改訂元</dt>
+      <dd><%= link_to "##{@parent.id} #{@parent.name}", admin_blueprint_path(@parent) %></dd>
+    <% end %>
+
+    <dt>ジョブ</dt>
+    <dd><%= @blueprint.jobs.count %> 件</dd>
+  </dl>
+
+  <h2>
+    Dockerfile
+    <% if @parent %><span class="dim">— 前の版との差分</span><% end %>
+  </h2>
+
+  <div class="panel">
+    <div class="panel-head">
+      <span>build フェーズはネットワークに出られます。ここで走るコマンドを読んでから承認してください。</span>
+      <span><%= number_to_human_size(@blueprint.dockerfile.bytesize) %></span>
+    </div>
+    <ol class="lines">
+      <% if @parent %>
+        <% line_diff(@parent.dockerfile, @blueprint.dockerfile, syntax: :dockerfile).each do |kind, line| %>
+          <li class="<%= kind unless kind == :same %>"><span><%= line %></span></li>
+        <% end %>
+      <% else %>
+        <% highlight_lines(@blueprint.dockerfile, syntax: :dockerfile).each do |line| %>
+          <li><span><%= line %></span></li>
+        <% end %>
+      <% end %>
+    </ol>
+  </div>
+
+  <h2>context <span class="dim"><%= @blueprint.blueprint_files.size %> ファイル / <%= number_to_human_size(@blueprint.context_bytes) %></span></h2>
+
+  <% if @blueprint.blueprint_files.empty? %>
+    <div class="empty">
+      <p>付随ファイルはありません。Dockerfile だけで組み立てられます。</p>
+    </div>
+  <% else %>
+    <% @blueprint.blueprint_files.each do |file| %>
+      <div class="panel">
+        <div class="panel-head">
+          <span class="mono"><%= file.path %></span>
+          <span><%= "実行可能 / " if file.executable %><%= number_to_human_size(file.content.bytesize) %></span>
+        </div>
+        <ol class="lines">
+          <% highlight_lines(file.content, syntax: :plain).each do |line| %>
+            <li><span><%= line %></span></li>
+          <% end %>
+        </ol>
+      </div>
+    <% end %>
   <% end %>
-</dl>
 
-<h2>Dockerfile</h2>
-<pre><%= @blueprint.dockerfile %></pre>
+  <h2>レビュー</h2>
 
-<% if @parent %>
-  <h2>前の版の Dockerfile</h2>
-  <pre><%= @parent.dockerfile %></pre>
-<% end %>
-
-<h2>context (<%= @blueprint.blueprint_files.size %> ファイル / <%= @blueprint.context_bytes %> バイト)</h2>
-<% @blueprint.blueprint_files.each do |file| %>
-  <h3><%= file.path %><%= " (executable)" if file.executable %></h3>
-  <pre><%= file.content %></pre>
-<% end %>
-
-<h2>レビュー</h2>
-<%= form_with url: approve_admin_blueprint_path(@blueprint), method: :post do %>
-  <%= submit_tag "承認" %>
-<% end %>
-
-<%= form_with url: reject_admin_blueprint_path(@blueprint), method: :post do |form| %>
-  <%= form.text_field :review_note, placeholder: "却下の理由" %>
-  <%= submit_tag "却下" %>
-<% end %>
-
-<%= form_with url: revoke_admin_blueprint_path(@blueprint), method: :post do |form| %>
-  <%= form.text_field :review_note, placeholder: "失効の理由" %>
-  <%= submit_tag "失効" %>
-<% end %>
+  <div class="actions">
+    <% if @blueprint.approved? %>
+      <%= form_with url: revoke_admin_blueprint_path(@blueprint), method: :post,
+            data: { turbo_confirm: "以降この実行環境への投入を止めます。キューに残っているジョブは走ります。" } do |form| %>
+        <%= form.text_field :review_note, placeholder: "失効させる理由" %>
+        <%= form.submit "失効させる", class: "btn-stop" %>
+      <% end %>
+    <% elsif @blueprint.pending_review? %>
+      <%= button_to "承認する", approve_admin_blueprint_path(@blueprint), class: "btn-go" %>
+      <%= form_with url: reject_admin_blueprint_path(@blueprint), method: :post do |form| %>
+        <%= form.text_field :review_note, placeholder: "却下する理由" %>
+        <%= form.submit "却下する", class: "btn-stop" %>
+      <% end %>
+    <% else %>
+      <p class="dim">この実行環境は <%= @blueprint.state %> です。新しく提案されたものをレビューしてください。</p>
+    <% end %>
+  </div>
+</div>

@@ -8,8 +8,10 @@ module Admin
 
     # 平文はその場で 1 度だけ表示する。DB に入るのは SHA256 だけなので、閉じたら二度と見られない
     def create
-      _worker, token = Worker.issue!(worker_id: params.fetch(:worker_id))
-      redirect_to admin_workers_path, notice: "トークンを発行しました（この 1 度だけ表示されます）: #{token}"
+      worker, token = Worker.issue!(worker_id: params.fetch(:worker_id))
+      # 平文は表示用の flash にだけ載せる。保存されるのはハッシュだけ
+      flash[:issued_token] = token
+      redirect_to admin_workers_path, notice: "#{worker.worker_id} のトークンを発行しました"
     rescue ActiveRecord::RecordInvalid => e
       redirect_to admin_workers_path, alert: e.record.errors.full_messages.join(", ")
     end

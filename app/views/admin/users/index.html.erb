@@ -1,19 +1,46 @@
-<h1>Users</h1>
+<% content_for :title, "ユーザー" %>
 
-<table>
-  <thead><tr><th>login</th><th>role</th><th>承認</th><th></th></tr></thead>
-  <tbody>
-    <% @users.each do |user| %>
-      <tr>
-        <td><%= user.login %></td>
-        <td><%= user.role %></td>
-        <td><%= user.approved_by&.login %> <%= user.approved_at %></td>
-        <td>
-          <% User.roles.keys.reject { |role| role == user.role }.each do |role| %>
-            <%= button_to role, admin_user_path(user, role:), method: :patch %>
-          <% end %>
-        </td>
-      </tr>
-    <% end %>
-  </tbody>
-</table>
+<div class="sheet sheet-narrow">
+  <h1>ユーザー <span class="h1-sub"><%= @users.size %> 人</span></h1>
+
+  <p class="dim">
+    承認待ちのユーザーにできることはありません。
+    <code class="mono">member</code> にすると MCP から実行環境とジョブを扱えるようになり、
+    <code class="mono">admin</code> にするとこの管理画面も開けます。
+  </p>
+
+  <table class="rows">
+    <thead>
+      <tr><th>GitHub</th><th>ロール</th><th>承認</th><th>操作</th></tr>
+    </thead>
+    <tbody>
+      <% @users.each do |user| %>
+        <tr class="<%= "needs-review" if user.pending? %>">
+          <td>
+            <%= user.login %>
+            <% if user.name.present? && user.name != user.login %>
+              <span class="dim"><%= user.name %></span>
+            <% end %>
+          </td>
+          <td><%= state_tag(user.role) %></td>
+          <td class="dim">
+            <% if user.approved_at %>
+              <%= user.approved_by&.login %> <%= since(user.approved_at) %>
+            <% else %>
+              —
+            <% end %>
+          </td>
+          <td>
+            <div class="actions">
+              <% User.roles.keys.reject { |role| role == user.role }.each do |role| %>
+                <%= button_to role_action_label(role), admin_user_path(user, role:), method: :patch,
+                      class: ("btn-go" if role == "member"),
+                      form: { data: { turbo_confirm: ("#{user.login} を承認待ちに戻します。開いているセッションも切れます。" if role == "pending") } } %>
+              <% end %>
+            </div>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>

@@ -1,10 +1,292 @@
 /*
- * This is a manifest file that'll be compiled into application.css.
+ * mcp-sandbox-app の管理画面。
  *
- * With Propshaft, assets are served efficiently without preprocessing steps. You can still include
- * application-wide styles in this file, but keep in mind that CSS precedence will follow the standard
- * cascading order, meaning styles declared later in the document or manifest will override earlier ones,
- * depending on specificity.
- *
- * Consider organizing styles into separate files for maintainability.
+ * 主役は Dockerfile と実行結果。等幅は機械が出した値（digest・パス・exit code・
+ * ログ）にだけ使い、ラベルの飾りには使わない。
  */
+
+:root {
+  --paper: #eef1f5;
+  --field: #ffffff;
+  --ink: #0f2338;
+  --ink-soft: #4a5f74;
+  --ink-faint: #7b8da0;
+  --rule: #ccd6e0;
+  --rule-firm: #a9b8c6;
+
+  --go: #16624a;
+  --wait: #8a5b00;
+  --stop: #9a2b1e;
+  --live: #14568a;
+
+  --go-wash: #e3f0ea;
+  --wait-wash: #f6eddb;
+  --stop-wash: #f6e2de;
+  --live-wash: #e2edf6;
+
+  --step: 0.5rem;
+  --sans: system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0d151d;
+    --field: #16202b;
+    --ink: #dfe8f1;
+    --ink-soft: #9db0c4;
+    --ink-faint: #6c8098;
+    --rule: #26333f;
+    --rule-firm: #3a4b5c;
+
+    --go: #6fc79f;
+    --wait: #d9a441;
+    --stop: #e2857a;
+    --live: #6fb2e8;
+
+    --go-wash: #16302a;
+    --wait-wash: #322a19;
+    --stop-wash: #35211e;
+    --live-wash: #14283a;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-text-size-adjust: 100%;
+}
+
+a { color: var(--live); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:hover { text-decoration-thickness: 2px; }
+
+:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
+
+/* ---- 上部バー。識別とナビゲーションに加えて、ワーカーの生存を常時見せる ---- */
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: calc(var(--step) * 2);
+  padding: calc(var(--step) * 1.5) calc(var(--step) * 3);
+  background: var(--field);
+  border-bottom: 1px solid var(--rule);
+}
+
+.bar-mark {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--ink-soft);
+  margin-right: var(--step);
+}
+
+.bar nav { display: flex; gap: calc(var(--step) * 2); flex: 1; }
+
+.bar nav a {
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding-bottom: 2px;
+  border-bottom: 2px solid transparent;
+}
+
+.bar nav a:hover { color: var(--ink); }
+.bar nav a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--ink); }
+
+.bar-side { display: flex; align-items: baseline; gap: calc(var(--step) * 2); font-size: 13px; }
+.bar-who { color: var(--ink-faint); }
+.bar-side button { border-color: transparent; background: none; color: var(--ink-faint); padding: 2px 4px; }
+.bar-side button:hover { color: var(--ink); border-color: var(--rule-firm); }
+
+/* ---- 本体 ---- */
+
+main { padding: calc(var(--step) * 4) calc(var(--step) * 3) calc(var(--step) * 8); }
+.sheet { max-width: 76rem; margin: 0 auto; }
+.sheet-narrow { max-width: 58rem; }
+
+h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 calc(var(--step) * 3);
+}
+
+h1 .h1-sub { color: var(--ink-faint); font-weight: 400; }
+
+h2 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: calc(var(--step) * 5) 0 calc(var(--step) * 1.5);
+  padding-bottom: calc(var(--step) * 0.5);
+  border-bottom: 1px solid var(--rule);
+}
+
+h3 { font-size: 0.85rem; font-weight: 600; color: var(--ink-soft); margin: calc(var(--step) * 3) 0 var(--step); }
+
+/* ---- 状態。角の四角と語で示す。ピルは使わない ---- */
+
+.state { display: inline-flex; align-items: center; gap: 0.45em; white-space: nowrap; }
+.state::before { content: ""; width: 0.55em; height: 0.55em; background: currentColor; }
+.state-go { color: var(--go); }
+.state-wait { color: var(--wait); }
+.state-stop { color: var(--stop); }
+.state-live { color: var(--live); }
+.state-mute { color: var(--ink-faint); }
+
+/* ---- 表 ---- */
+
+.rows { width: 100%; border-collapse: collapse; background: var(--field); border: 1px solid var(--rule); }
+.rows th, .rows td { padding: calc(var(--step) * 1.1) calc(var(--step) * 1.5); text-align: left; }
+.rows thead th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-faint);
+  border-bottom: 1px solid var(--rule-firm);
+  white-space: nowrap;
+}
+.rows tbody tr + tr td { border-top: 1px solid var(--rule); }
+.rows tbody tr:hover td { background: var(--paper); }
+.rows td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.rows-scroll { overflow-x: auto; }
+.rows td.nowrap, .rows th.nowrap { white-space: nowrap; }
+
+/* 人の手を待っている行だけ、左端に印を出す */
+.rows tr.needs-review td:first-child { box-shadow: inset 3px 0 0 var(--wait); }
+
+.mono { font-family: var(--mono); font-size: 0.875em; }
+.dim { color: var(--ink-faint); }
+
+/* ---- 定義リスト ---- */
+
+.facts { display: grid; grid-template-columns: max-content 1fr; gap: calc(var(--step) * 0.75) calc(var(--step) * 3); margin: 0; }
+.facts dt { color: var(--ink-faint); font-size: 13px; }
+.facts dd { margin: 0; }
+
+/* ---- コードとログ ---- */
+
+.panel { background: var(--field); border: 1px solid var(--rule); margin: 0 0 calc(var(--step) * 2); }
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--step);
+  padding: calc(var(--step) * 0.75) calc(var(--step) * 1.5);
+  border-bottom: 1px solid var(--rule);
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.panel pre {
+  margin: 0;
+  padding: calc(var(--step) * 1.5);
+  overflow: auto;
+  max-height: 32rem;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre;
+  tab-size: 2;
+}
+
+/* 行番号つき。レビューは行単位で読むので番号は情報 */
+.lines { margin: 0; padding: calc(var(--step) * 1.5) 0; list-style: none; counter-reset: line; overflow: auto; max-height: 36rem; }
+.lines li {
+  counter-increment: line;
+  display: grid;
+  grid-template-columns: 3.2rem 1fr;
+  gap: calc(var(--step) * 1.5);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.lines li::before { content: counter(line); color: var(--ink-faint); text-align: right; user-select: none; }
+.lines li.add { background: var(--go-wash); }
+.lines li.del { background: var(--stop-wash); }
+.lines li.add::before { content: "+"; color: var(--go); }
+.lines li.del::before { content: "−"; color: var(--stop); }
+
+/* ---- 操作 ---- */
+
+.actions { display: flex; flex-wrap: wrap; gap: var(--step); align-items: flex-start; margin-top: calc(var(--step) * 2); }
+.actions form { display: flex; gap: var(--step); align-items: center; }
+
+button, input[type="submit"] {
+  font: inherit;
+  font-size: 14px;
+  padding: calc(var(--step) * 0.7) calc(var(--step) * 1.75);
+  background: var(--field);
+  color: var(--ink);
+  border: 1px solid var(--rule-firm);
+  cursor: pointer;
+}
+button:hover, input[type="submit"]:hover { border-color: var(--ink-soft); }
+
+.btn-go { background: var(--go-wash); border-color: var(--go); color: var(--go); font-weight: 600; }
+.btn-stop { background: var(--stop-wash); border-color: var(--stop); color: var(--stop); }
+
+input[type="text"] {
+  font: inherit;
+  font-size: 14px;
+  padding: calc(var(--step) * 0.7) var(--step);
+  background: var(--field);
+  color: var(--ink);
+  border: 1px solid var(--rule-firm);
+  min-width: 16rem;
+}
+
+/* ---- 通知 ---- */
+
+.flash { padding: calc(var(--step) * 1.25) calc(var(--step) * 2); border: 1px solid; margin-bottom: calc(var(--step) * 3); }
+.flash-notice { background: var(--go-wash); border-color: var(--go); color: var(--go); }
+.flash-alert { background: var(--stop-wash); border-color: var(--stop); color: var(--stop); }
+
+/* 一度しか表示されない値。閉じたら二度と見られないことを画面で伝える */
+.secret { background: var(--wait-wash); border: 1px solid var(--wait); padding: calc(var(--step) * 2); margin-bottom: calc(var(--step) * 3); }
+.secret p { margin: 0 0 var(--step); color: var(--wait); font-size: 14px; }
+.secret-value { display: flex; gap: var(--step); align-items: center; flex-wrap: wrap; }
+.secret code { font-family: var(--mono); font-size: 14px; background: var(--field); padding: calc(var(--step) * 0.75) var(--step); border: 1px solid var(--rule-firm); word-break: break-all; }
+
+/* ---- 空の状態。指示を出す場所であって、雰囲気を出す場所ではない ---- */
+
+.empty { background: var(--field); border: 1px dashed var(--rule-firm); padding: calc(var(--step) * 4); color: var(--ink-soft); }
+.empty p { margin: 0 0 var(--step); }
+.empty p:last-child { margin: 0; }
+
+.warn { color: var(--stop); }
+p.warn { background: var(--stop-wash); border-left: 3px solid var(--stop); padding: calc(var(--step) * 1.25) calc(var(--step) * 2); margin: calc(var(--step) * 2) 0 0; }
+
+/* ---- ログイン ---- */
+
+.gate { max-width: 26rem; margin: 12vh auto; padding: 0 calc(var(--step) * 3); }
+.gate h1 { font-size: 1.25rem; }
+.gate p { color: var(--ink-soft); }
+.gate hr { border: 0; border-top: 1px solid var(--rule); margin: calc(var(--step) * 4) 0; }
+
+@media (max-width: 40rem) {
+  .bar { padding: var(--step) calc(var(--step) * 2); }
+  main { padding: calc(var(--step) * 3) calc(var(--step) * 2) calc(var(--step) * 6); }
+  .facts { grid-template-columns: 1fr; gap: 0 0; }
+  .facts dd { margin-bottom: var(--step); }
+}
+
+/* ---- Rouge のトークン。配色は本体のパレットから引く ---- */
+
+:root { --code-key: #6d4bb0; }
+@media (prefers-color-scheme: dark) { :root { --code-key: #b79ce8; } }
+
+.c, .c1, .cm, .cs, .cp, .cd { color: var(--ink-faint); font-style: italic; }
+.k, .kc, .kd, .kn, .kp, .kr, .kt, .kv { color: var(--code-key); font-weight: 600; }
+.s, .s1, .s2, .sa, .sb, .sc, .sd, .se, .sh, .si, .sx, .sr, .ss, .dl { color: var(--go); }
+.m, .mb, .mf, .mh, .mi, .mo, .il { color: var(--wait); }
+.nb, .bp, .nc, .no, .nn, .ne, .nt { color: var(--live); }
+.nf, .fm, .nd { color: var(--ink); font-weight: 600; }
+.nv, .vc, .vg, .vi, .na { color: var(--code-key); }
+.o, .ow, .p { color: var(--ink-soft); }
+.err { color: var(--stop); text-decoration: underline wavy; }

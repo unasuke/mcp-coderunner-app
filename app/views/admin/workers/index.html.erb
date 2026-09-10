@@ -1,51 +1,103 @@
-<h1>Workers</h1>
+<% content_for :title, "ワーカー" %>
 
-<p>サーバー側の commit: <code><%= @server_commit %></code></p>
+<div class="sheet">
+  <h1>ワーカー</h1>
 
-<h2>資格情報</h2>
-<table>
-  <thead><tr><th>worker_id</th><th>失効</th><th></th></tr></thead>
-  <tbody>
-    <% @workers.each do |worker| %>
-      <tr>
-        <td><%= worker.worker_id %></td>
-        <td><%= worker.revoked_at %></td>
-        <td>
-          <% unless worker.revoked? %>
-            <%= button_to "失効", revoke_admin_worker_path(worker), method: :post %>
+  <h2>起動中のインスタンス</h2>
+
+  <% if @processes.empty? %>
+    <div class="empty">
+      <p>動いているワーカーがありません。投入したジョブは待ち行列に溜まったままになります。</p>
+      <p>VM で <code class="mono">systemctl status mcp-sandbox-app-worker</code> を確認してください。</p>
+    </div>
+  <% else %>
+    <div class="rows-scroll">
+      <table class="rows">
+        <thead>
+          <tr>
+            <th>インスタンス</th>
+            <th>ワーカー</th>
+            <th>最終 heartbeat</th>
+            <th class="num nowrap">実行中</th>
+            <th>実装</th>
+            <th>Ruby</th>
+            <th>Docker</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @processes.each do |process| %>
+            <tr>
+              <td><%= short(process.instance_id, 8) %></td>
+              <td class="nowrap"><%= process.worker_id %></td>
+              <td class="nowrap">
+                <% if process.alive? %>
+                  <span class="state state-go"><%= since(process.last_heartbeat_at) %></span>
+                <% else %>
+                  <span class="state state-stop">途絶 <%= since(process.last_heartbeat_at) %></span>
+                <% end %>
+              </td>
+              <td class="num mono nowrap"><%= process.busy %>/<%= process.capacity %></td>
+              <td class="nowrap">
+                <%= commit_label(process.commit_hash) %>
+                <% if process.commit_hash != @server_commit %>
+                  <span class="state state-stop">ずれ</span>
+                <% end %>
+              </td>
+              <td class="mono dim"><%= process.ruby_version %></td>
+              <td class="mono dim"><%= process.docker_version %></td>
+            </tr>
           <% end %>
-        </td>
-      </tr>
-    <% end %>
-  </tbody>
-</table>
+        </tbody>
+      </table>
+    </div>
 
-<%= form_with url: admin_workers_path, method: :post do |form| %>
-  <%= form.text_field :worker_id, placeholder: "home-vm-01" %>
-  <%= submit_tag "トークンを発行" %>
-<% end %>
-
-<h2>起動中のインスタンス</h2>
-<table>
-  <thead>
-    <tr><th>instance</th><th>worker</th><th>最終 heartbeat</th><th>busy/capacity</th><th>commit</th><th>ruby</th><th>docker</th></tr>
-  </thead>
-  <tbody>
-    <% @processes.each do |process| %>
-      <tr>
-        <td><code><%= process.instance_id.first(8) %></code></td>
-        <td><%= process.worker_id %></td>
-        <td><%= process.last_heartbeat_at %><%= " (stale)" unless process.alive? %></td>
-        <td><%= process.busy %>/<%= process.capacity %></td>
-        <td>
-          <code><%= process.commit_hash.first(8) %></code>
-          <% if process.commit_hash != @server_commit %>
-            <strong>サーバーとずれています。VM で git pull して systemctl restart mcp-sandbox-app-worker してください</strong>
-          <% end %>
-        </td>
-        <td><%= process.ruby_version %></td>
-        <td><%= process.docker_version %></td>
-      </tr>
+    <% if @processes.any? { |process| process.commit_hash != @server_commit } %>
+      <p class="warn">
+        サーバー側の実装は <%= commit_label(@server_commit) %> です。
+        ずれているインスタンスは、VM で <code class="mono">git pull</code> して
+        <code class="mono">systemctl restart mcp-sandbox-app-worker</code> してください。
+        実行は止まりませんが、挙動が食い違うことがあります。
+      </p>
     <% end %>
-  </tbody>
-</table>
+  <% end %>
+
+  <h2>資格情報</h2>
+
+  <table class="rows">
+    <thead>
+      <tr><th>worker_id</th><th>状態</th><th>発行</th><th>操作</th></tr>
+    </thead>
+    <tbody>
+      <% @workers.each do |worker| %>
+        <tr>
+          <td class="mono"><%= worker.worker_id %></td>
+          <td class="nowrap">
+            <% if worker.revoked? %>
+              <span class="state state-stop">失効 <%= since(worker.revoked_at) %></span>
+            <% else %>
+              <span class="state state-go">有効</span>
+            <% end %>
+          </td>
+          <td class="dim nowrap"><%= since(worker.created_at) %></td>
+          <td>
+            <% unless worker.revoked? %>
+              <%= button_to "失効させる", revoke_admin_worker_path(worker), class: "btn-stop",
+                    form: { data: { turbo_confirm: "#{worker.worker_id} は以降ジョブを受け取れなくなります。" } } %>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+      <% if @workers.empty? %>
+        <tr><td colspan="4" class="dim">まだ発行していません。</td></tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <h2>トークンを発行する</h2>
+  <p class="dim">平文はこの画面に一度だけ出ます。保存されるのはハッシュだけなので、閉じたら再発行になります。</p>
+
+  <%= form_with url: admin_workers_path, method: :post, class: "actions" do |form| %>
+    <%= form.text_field :worker_id, placeholder: "home-vm-01" %>
+    <%= form.submit "発行する" %>
+  <% end %>
+</div>

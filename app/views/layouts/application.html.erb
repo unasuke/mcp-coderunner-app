@@ -1,35 +1,41 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
   <head>
-    <title><%= content_for(:title) || "mcp-sandbox-app" %></title>
+    <title><%= [ content_for(:title), "mcp-sandbox-app" ].compact.join(" — ") %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <meta name="apple-mobile-web-app-capable" content="yes">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
 
     <%= yield :head %>
 
     <link rel="icon" href="/icon.png" type="image/png">
-    <link rel="apple-touch-icon" href="/icon.png">
     <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
     <%= javascript_include_tag "application", "data-turbo-track": "reload", type: "module" %>
   </head>
 
   <body>
-    <nav>
-      <%= link_to "jobs", admin_jobs_path %>
-      <%= link_to "blueprints", admin_blueprints_path %>
-      <%= link_to "users", admin_users_path %>
-      <%= link_to "workers", admin_workers_path %>
-      <% if Current.user %>
-        <span><%= Current.user.login %> (<%= Current.user.role %>)</span>
-        <%= button_to "ログアウト", logout_path, method: :delete %>
-      <% end %>
-    </nav>
+    <% if Current.user %>
+      <header class="bar">
+        <span class="bar-mark">mcp-sandbox-app</span>
 
-    <% if flash[:notice] %><p class="notice"><%= flash[:notice] %></p><% end %>
-    <% if flash[:alert] %><p class="alert"><%= flash[:alert] %></p><% end %>
+        <nav>
+          <%= link_to "ジョブ", admin_jobs_path, "aria-current": ("page" if controller_path == "admin/jobs") %>
+          <%= link_to "実行環境", admin_blueprints_path, "aria-current": ("page" if controller_path == "admin/blueprints") %>
+          <%= link_to "ユーザー", admin_users_path, "aria-current": ("page" if controller_path == "admin/users") %>
+          <%= link_to "ワーカー", admin_workers_path, "aria-current": ("page" if controller_path == "admin/workers") %>
+        </nav>
 
-    <main><%= yield %></main>
+        <div class="bar-side">
+          <%= worker_pulse %>
+          <span class="bar-who"><%= Current.user.login %>（<%= Current.user.role %>）</span>
+          <%= button_to "ログアウト", logout_path, method: :delete %>
+        </div>
+      </header>
+    <% end %>
+
+    <main>
+      <%= render "layouts/flash" %>
+      <%= yield %>
+    </main>
   </body>
 </html>

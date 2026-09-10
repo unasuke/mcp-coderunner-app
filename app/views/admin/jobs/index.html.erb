@@ -1,19 +1,43 @@
-<h1>Jobs</h1>
+<% content_for :title, "ジョブ" %>
 
-<table>
-  <thead>
-    <tr><th>id</th><th>state</th><th>profile</th><th>blueprint</th><th>結果</th><th>作成</th></tr>
-  </thead>
-  <tbody>
-    <% @jobs.each do |job| %>
-      <tr>
-        <td><%= link_to job.id, admin_job_path(job) %></td>
-        <td><%= job.state %></td>
-        <td><%= job.profile %></td>
-        <td><%= link_to job.blueprint.name, admin_blueprint_path(job.blueprint) %></td>
-        <td><%= job.job_result&.termination_reason %> <%= job.job_result&.exit_code %></td>
-        <td><%= job.created_at %></td>
-      </tr>
-    <% end %>
-  </tbody>
-</table>
+<div class="sheet">
+  <h1>ジョブ <span class="h1-sub"><%= @jobs.size %> 件</span></h1>
+
+  <% if @jobs.empty? %>
+    <div class="empty">
+      <p>まだジョブがありません。</p>
+      <p>MCP クライアントから <code class="mono">submit_job</code> を投げると、承認済みの実行環境の上で走ります。</p>
+    </div>
+  <% else %>
+    <div class="rows-scroll">
+      <table class="rows">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>状態</th>
+            <th>結果</th>
+            <th class="num">exit</th>
+            <th class="num">所要 (ms)</th>
+            <th>実行環境</th>
+            <th>プロファイル</th>
+            <th>投入</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @jobs.each do |job| %>
+            <tr class="<%= "needs-review" if job.pending_review? %>">
+              <td><%= link_to job.id, admin_job_path(job), class: "mono" %></td>
+              <td><%= state_tag(job.state) %></td>
+              <td><%= outcome_tag(job.job_result) %></td>
+              <td class="num mono"><%= job.job_result&.exit_code %></td>
+              <td class="num mono"><%= number_with_delimiter(job.job_result&.duration_ms) %></td>
+              <td><%= link_to job.blueprint.name, admin_blueprint_path(job.blueprint) %></td>
+              <td><%= job.profile %></td>
+              <td class="dim"><%= since(job.created_at) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+</div>

@@ -127,8 +127,11 @@ class AdminTest < ActionDispatch::IntegrationTest
 
     post admin_workers_path, params: { worker_id: "home-vm-01" }
 
-    assert_predicate Worker.find_by(worker_id: "home-vm-01"), :present?
-    assert_match(/トークンを発行しました/, flash[:notice])
+    worker = Worker.find_by(worker_id: "home-vm-01")
+
+    assert_predicate worker, :present?
+    # 平文は表示用に一度だけ渡す。保存されるのはハッシュだけ
+    assert_equal Worker.digest(flash[:issued_token]), worker.token_digest
   end
 
   test "promoting a user drops their sessions when they lose access" do
