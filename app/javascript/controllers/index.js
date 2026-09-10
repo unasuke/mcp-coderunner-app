@@ -6,3 +6,6 @@ import { application } from "./application"
 
 import ClipboardController from "./clipboard_controller"
 application.register("clipboard", ClipboardController)
+
+import RefreshController from "./refresh_controller"
+application.register("refresh", RefreshController)

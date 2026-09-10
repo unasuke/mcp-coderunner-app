@@ -1,13 +1,15 @@
 <% content_for :title, "ジョブ ##{@job.id}" %>
 
-<% unless @job.finished? || @job.rejected? %>
-  <% content_for :head do %>
-    <meta http-equiv="refresh" content="5">
-  <% end %>
-<% end %>
+<% live = !(@job.finished? || @job.rejected?) %>
 
-<div class="sheet">
-  <h1>ジョブ #<%= @job.id %> <span class="h1-sub"><%= state_tag(@job.state) %></span></h1>
+<div class="sheet" <%= tag.attributes(data: { controller: "refresh" }) if live %>>
+  <h1>
+    ジョブ #<%= @job.id %>
+    <span class="h1-sub">
+      <%= state_tag(@job.state) %>
+      <% if live %><span class="dim">— 5 秒ごとに更新</span><% end %>
+    </span>
+  </h1>
 
   <dl class="facts">
     <dt>実行環境</dt>

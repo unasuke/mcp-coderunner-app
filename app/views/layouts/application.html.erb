@@ -6,6 +6,10 @@
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
 
+    <%# 同じ URL への再訪問（ジョブの自動更新）は差分適用にして、スクロール位置を保つ %>
+    <meta name="turbo-refresh-method" content="morph">
+    <meta name="turbo-refresh-scroll" content="preserve">
+
     <%= yield :head %>
 
     <link rel="icon" href="/icon.png" type="image/png">
