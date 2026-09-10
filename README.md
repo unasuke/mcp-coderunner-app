@@ -18,7 +18,6 @@ app/                 Rails: models, controllers, MCP ツール, /admin
 lib/protocol/        Rails とワーカーが共有する DTO と定数（stdlib のみ）
 worker/              docker を回す側（stdlib のみ。Rails を読まない）
 bin/worker           VM で動かす常駐プロセス
-bin/mcp_stdio        フェーズ 2 限りの暫定 stdio サーバー
 deploy/              systemd unit と Caddyfile の例
 docs/worker-setup.md VM 側のセットアップ手順
 ```
@@ -39,15 +38,8 @@ ruby -Ilib -I. worker/test/policy_test.rb
 MCP_SANDBOX_APP_E2E=1 ruby -Ilib -I. worker/test/e2e_test.rb
 ```
 
-`bin/mcp_stdio` は Claude Desktop から stdio で繋いで単発実行するためのもの。
-
-```json
-{
-  "mcpServers": {
-    "mcp-sandbox-app-local": { "command": "/path/to/mcp-sandbox-app/bin/mcp_stdio" }
-  }
-}
-```
+MCP クライアントからは Streamable HTTP で `http://localhost:3000/mcp` に繋ぐ。
+アクセストークンは `/admin` でログインしたうえで発行する。
 
 ## 環境変数
 

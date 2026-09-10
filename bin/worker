@@ -2,7 +2,7 @@
 # frozen_string_literal: true
 
 # 自宅 VM で動かす常駐プロセス。systemd から起動する。
-# 単発実行のサブコマンドは持たない（手で叩く用途は bin/mcp_stdio が持つ）。
+# 単発実行のサブコマンドは持たない。手で叩きたいときは MCP エンドポイント経由で投げる。
 
 root = File.expand_path("..", __dir__)
 $LOAD_PATH.unshift(File.join(root, "lib"), root)
