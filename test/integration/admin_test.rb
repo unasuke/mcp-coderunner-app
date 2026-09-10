@@ -24,7 +24,7 @@ class AdminTest < ActionDispatch::IntegrationTest
   # 本番相当の設定では開発用ログインの口が存在しない。
   # これは認可の中心を迂回する口なので、設定が無効なら経路ごと消えていること
   test "the developer login is absent unless it is explicitly allowed" do
-    refute Rails.configuration.x.mcp_sandbox_app.allow_developer_login
+    refute Rails.configuration.x.mcp_coderunner_app.allow_developer_login
 
     post "/auth/developer"
 
@@ -37,7 +37,7 @@ class AdminTest < ActionDispatch::IntegrationTest
   end
 
   test "the first login becomes admin when it matches the bootstrap login" do
-    Rails.configuration.x.mcp_sandbox_app.bootstrap_admin_login = "unasuke"
+    Rails.configuration.x.mcp_coderunner_app.bootstrap_admin_login = "unasuke"
     OmniAuth.config.mock_auth[:github] = OmniAuth::AuthHash.new(
       provider: "github", uid: "1", info: { nickname: "unasuke", name: nil, image: nil }
     )
@@ -47,7 +47,7 @@ class AdminTest < ActionDispatch::IntegrationTest
 
     assert_predicate User.find_by(github_uid: "1"), :admin?
   ensure
-    Rails.configuration.x.mcp_sandbox_app.bootstrap_admin_login = nil
+    Rails.configuration.x.mcp_coderunner_app.bootstrap_admin_login = nil
   end
 
   # 以降の新規ログインは全員 pending。できることは何もない

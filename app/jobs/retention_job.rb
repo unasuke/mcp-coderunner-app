@@ -4,7 +4,7 @@ class RetentionJob < ApplicationJob
   queue_as :default
 
   def perform(now: Time.current)
-    config = Rails.configuration.x.mcp_sandbox_app
+    config = Rails.configuration.x.mcp_coderunner_app
 
     JobResult.where(created_at: ...(now - config.result_retention_days.days)).delete_all
     purge_scripts(now, config.script_retention_days.days)

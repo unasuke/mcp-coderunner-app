@@ -44,10 +44,10 @@ development:
   bootstrap_admin_login: dev
 
 test:
-  base_url: http://mcp-sandbox-app.invalid
+  base_url: http://mcp-coderunner-app.invalid
 
 production:
-  base_url: <%= ENV.fetch("MCP_SANDBOX_APP_BASE_URL", "https://mcp-sandbox-app.example.com") %>
+  base_url: <%= ENV.fetch("MCP_CODERUNNER_APP_BASE_URL", "https://mcp-coderunner-app.example.com") %>
   bootstrap_admin_login: <%= ENV["BOOTSTRAP_ADMIN_GITHUB_LOGIN"] %>
   # Kamal がデプロイするリビジョンを渡す。無ければビルド時に埋めた GIT_COMMIT
   commit_hash: <%= ENV["KAMAL_VERSION"] || ENV["GIT_COMMIT"] || "unknown" %>

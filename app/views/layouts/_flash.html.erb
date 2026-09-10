@@ -1,6 +1,6 @@
 <% if flash[:issued_token] %>
   <div class="secret" data-controller="clipboard">
-    <p>このトークンが表示されるのはこの一度だけです。VM の <code class="mono">/etc/mcp-sandbox-app/token</code> に置いてください。</p>
+    <p>このトークンが表示されるのはこの一度だけです。VM の <code class="mono">/etc/mcp-coderunner-app/token</code> に置いてください。</p>
     <div class="secret-value">
       <code data-clipboard-target="source"><%= flash[:issued_token] %></code>
       <button type="button" data-action="clipboard#copy">コピー</button>

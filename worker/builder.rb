@@ -33,7 +33,7 @@ module Worker
     end
 
     def build!(tag:, dockerfile:, files:)
-      Dir.mktmpdir("mcp-sandbox-app-build") do |dir|
+      Dir.mktmpdir("mcp-coderunner-app-build") do |dir|
         write_context(dir, dockerfile, files)
 
         result = Docker.run("build", "--tag", tag, "--file", File.join(dir, "Dockerfile"), dir)

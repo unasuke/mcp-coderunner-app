@@ -16,7 +16,7 @@ module McpTools
 
       # review_url を返すことで、人間に「ここを見てほしい」と伝えられる
       def review_url(path)
-        URI.join(Rails.configuration.x.mcp_sandbox_app.base_url, path).to_s
+        URI.join(Rails.configuration.x.mcp_coderunner_app.base_url, path).to_s
       end
     end
   end

@@ -32,8 +32,8 @@ class McpController < ActionController::API
 
   # RFC 9728。401 からリソースメタデータを指す
   def doorkeeper_unauthorized_render_options(error: nil)
-    metadata = URI.join(Rails.configuration.x.mcp_sandbox_app.base_url, "/.well-known/oauth-protected-resource").to_s
-    headers["WWW-Authenticate"] = %(Bearer realm="mcp-sandbox-app", resource_metadata="#{metadata}")
+    metadata = URI.join(Rails.configuration.x.mcp_coderunner_app.base_url, "/.well-known/oauth-protected-resource").to_s
+    headers["WWW-Authenticate"] = %(Bearer realm="mcp-coderunner-app", resource_metadata="#{metadata}")
 
     { json: { error: "unauthorized", message: error&.description } }
   end

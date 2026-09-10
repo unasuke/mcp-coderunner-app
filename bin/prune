@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# ビルド済みイメージの掃除。systemd の mcp-sandbox-app-prune.timer から呼ぶ。
+# ビルド済みイメージの掃除。systemd の mcp-coderunner-app-prune.timer から呼ぶ。
 # ruby-head を毎晩引くなら特に必要になる。
 
 root = File.expand_path("..", __dir__)
@@ -11,7 +11,7 @@ require "optparse"
 require "worker/builder"
 require "worker/policy"
 
-options = { config: "/etc/mcp-sandbox-app/config.yml" }
+options = { config: "/etc/mcp-coderunner-app/config.yml" }
 OptionParser.new do |parser|
   parser.banner = "Usage: bin/prune [options]"
   parser.on("--config PATH", "設定ファイル（既定: #{options[:config]}）") { |v| options[:config] = v }

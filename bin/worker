@@ -20,8 +20,8 @@ require "worker/runner"
 
 module Worker
   class Agent
-    DEFAULT_CONFIG = "/etc/mcp-sandbox-app/config.yml"
-    DEFAULT_REVISION = "/opt/mcp-sandbox-app/REVISION"
+    DEFAULT_CONFIG = "/etc/mcp-coderunner-app/config.yml"
+    DEFAULT_REVISION = "/opt/mcp-coderunner-app/REVISION"
     BACKOFF_MAX = 30
 
     def initialize(config_path:, revision_path:)

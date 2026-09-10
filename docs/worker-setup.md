@@ -17,23 +17,23 @@ VPS の `/admin/workers` で `worker_id`（例: `home-vm-01`）を入れて発�
 ## 2. VM 側を用意する
 
 ```sh
-sudo useradd --system --no-create-home --shell /usr/sbin/nologin mcp-sandbox-app
-sudo usermod -aG docker mcp-sandbox-app
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin mcp-coderunner-app
+sudo usermod -aG docker mcp-coderunner-app
 
-sudo git clone <このリポジトリ> /opt/mcp-sandbox-app
-cd /opt/mcp-sandbox-app && sudo git rev-parse HEAD | sudo tee /opt/mcp-sandbox-app/REVISION
+sudo git clone <このリポジトリ> /opt/mcp-coderunner-app
+cd /opt/mcp-coderunner-app && sudo git rev-parse HEAD | sudo tee /opt/mcp-coderunner-app/REVISION
 
-sudo install -d -m 0755 /etc/mcp-sandbox-app
-sudo cp /opt/mcp-sandbox-app/worker/config.example.yml /etc/mcp-sandbox-app/config.yml
-sudo $EDITOR /etc/mcp-sandbox-app/config.yml          # worker_id と endpoint を書く
+sudo install -d -m 0755 /etc/mcp-coderunner-app
+sudo cp /opt/mcp-coderunner-app/worker/config.example.yml /etc/mcp-coderunner-app/config.yml
+sudo $EDITOR /etc/mcp-coderunner-app/config.yml          # worker_id と endpoint を書く
 
-printf '%s' '<発行されたトークン>' | sudo tee /etc/mcp-sandbox-app/token > /dev/null
-sudo chmod 0400 /etc/mcp-sandbox-app/token
-sudo chown root:root /etc/mcp-sandbox-app/token
+printf '%s' '<発行されたトークン>' | sudo tee /etc/mcp-coderunner-app/token > /dev/null
+sudo chmod 0400 /etc/mcp-coderunner-app/token
+sudo chown root:root /etc/mcp-coderunner-app/token
 ```
 
-`/etc/mcp-sandbox-app/token` は root しか読めない。ワーカーには systemd の `LoadCredential=` で渡るので、
-`mcp-sandbox-app` ユーザーがこのファイルを直接読める必要はない。
+`/etc/mcp-coderunner-app/token` は root しか読めない。ワーカーには systemd の `LoadCredential=` で渡るので、
+`mcp-coderunner-app` ユーザーがこのファイルを直接読める必要はない。
 
 ## 3. firewall
 
@@ -50,7 +50,7 @@ nftables なら、docker のブリッジ（既定では `docker0`、`172.17.0.0/
 RFC1918 のアドレスへ出る通信を落とす。
 
 ```
-table inet mcp-sandbox-app {
+table inet mcp-coderunner-app {
   chain forward {
     type filter hook forward priority 0; policy accept;
     iifname "docker0" ip daddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } drop
@@ -64,19 +64,19 @@ table inet mcp-sandbox-app {
 ## 4. unit を置いて起動する
 
 ```sh
-sudo cp /opt/mcp-sandbox-app/deploy/mcp-sandbox-app-worker.service /etc/systemd/system/
-sudo cp /opt/mcp-sandbox-app/deploy/mcp-sandbox-app-prune.service /etc/systemd/system/
-sudo cp /opt/mcp-sandbox-app/deploy/mcp-sandbox-app-prune.timer /etc/systemd/system/
+sudo cp /opt/mcp-coderunner-app/deploy/mcp-coderunner-app-worker.service /etc/systemd/system/
+sudo cp /opt/mcp-coderunner-app/deploy/mcp-coderunner-app-prune.service /etc/systemd/system/
+sudo cp /opt/mcp-coderunner-app/deploy/mcp-coderunner-app-prune.timer /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now mcp-sandbox-app-worker.service
-sudo systemctl enable --now mcp-sandbox-app-prune.timer
+sudo systemctl enable --now mcp-coderunner-app-worker.service
+sudo systemctl enable --now mcp-coderunner-app-prune.timer
 ```
 
 ## 5. 動作確認
 
 ```sh
 # 1 行 1 イベントで出る
-sudo journalctl -u mcp-sandbox-app-worker -f
+sudo journalctl -u mcp-coderunner-app-worker -f
 ```
 
 `/admin/workers` にインスタンスが出て、最終 heartbeat が 30 秒ごとに更新されていれば動いている。
@@ -94,10 +94,10 @@ ruby -Ilib -I. -e 'require "worker/runner"'
 ## 更新する
 
 ```sh
-cd /opt/mcp-sandbox-app
+cd /opt/mcp-coderunner-app
 sudo git pull
 sudo git rev-parse HEAD | sudo tee REVISION
-sudo systemctl restart mcp-sandbox-app-worker
+sudo systemctl restart mcp-coderunner-app-worker
 ```
 
 再起動時はワーカーが `/deregister` を打つので、走りかけのジョブは即座にキューへ戻る。
@@ -108,7 +108,7 @@ sudo systemctl restart mcp-sandbox-app-worker
 | 症状 | 見るところ |
 |---|---|
 | ジョブが `queued` のまま動かない | `/admin/workers` にインスタンスが出ているか。`drain` が立っていないか（protocol_version のずれ） |
-| `policy_rejected` が返る | `/etc/mcp-sandbox-app/config.yml` の上限と、Blueprint の context のパス |
+| `policy_rejected` が返る | `/etc/mcp-coderunner-app/config.yml` の上限と、Blueprint の context のパス |
 | `image_build_failed` | `job_results.stderr` の末尾にビルドログが入っている |
-| 401 が続く | トークンが失効していないか（`/admin/workers`）。`/etc/mcp-sandbox-app/token` の中身に改行が混ざっていないか |
-| コンテナが残る | `docker ps -a --filter label=mcp-sandbox-app.job`。unit の起動前・停止後の掃除で回収される |
+| 401 が続く | トークンが失効していないか（`/admin/workers`）。`/etc/mcp-coderunner-app/token` の中身に改行が混ざっていないか |
+| コンテナが残る | `docker ps -a --filter label=mcp-coderunner-app.job`。unit の起動前・停止後の掃除で回収される |

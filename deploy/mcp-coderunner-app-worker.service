@@ -1,23 +1,23 @@
 [Unit]
-Description=mcp-sandbox-app worker (Ruby exec MCP)
+Description=mcp-coderunner-app worker (Ruby exec MCP)
 After=network-online.target docker.service
 Wants=network-online.target
 Requires=docker.service
 
 [Service]
 Type=simple
-User=mcp-sandbox-app
+User=mcp-coderunner-app
 SupplementaryGroups=docker
-WorkingDirectory=/opt/mcp-sandbox-app
-ExecStart=/usr/bin/ruby /opt/mcp-sandbox-app/bin/worker --config /etc/mcp-sandbox-app/config.yml
+WorkingDirectory=/opt/mcp-coderunner-app
+ExecStart=/usr/bin/ruby /opt/mcp-coderunner-app/bin/worker --config /etc/mcp-coderunner-app/config.yml
 
 # トークンは環境変数に置かない。/proc/PID/environ にも systemctl show にも出ない
-LoadCredential=api_token:/etc/mcp-sandbox-app/token
+LoadCredential=api_token:/etc/mcp-coderunner-app/token
 
 # 異常終了するとジョブコンテナが残る。label で回収する
 # systemd はコマンド置換をしないので sh を挟む
-ExecStartPre=-/bin/sh -c 'docker ps -aq --filter label=mcp-sandbox-app.job | xargs -r docker rm --force --volumes'
-ExecStopPost=-/bin/sh -c 'docker ps -aq --filter label=mcp-sandbox-app.job | xargs -r docker rm --force --volumes'
+ExecStartPre=-/bin/sh -c 'docker ps -aq --filter label=mcp-coderunner-app.job | xargs -r docker rm --force --volumes'
+ExecStopPost=-/bin/sh -c 'docker ps -aq --filter label=mcp-coderunner-app.job | xargs -r docker rm --force --volumes'
 
 # SIGTERM を受けたワーカーは実行中のコンテナを片付けてから終わる。
 # ここが短いと、リースが切れるまでジョブが宙吊りになる
@@ -25,8 +25,8 @@ TimeoutStopSec=90
 Restart=always
 RestartSec=5
 
-RuntimeDirectory=mcp-sandbox-app
-StateDirectory=mcp-sandbox-app
+RuntimeDirectory=mcp-coderunner-app
+StateDirectory=mcp-coderunner-app
 
 # 注意: SupplementaryGroups=docker は実質 root。docker socket に触れる時点で
 # unit のハードニング項目は大半が意味を失う。実際の隔離境界は VM であって、この unit ではない

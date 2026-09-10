@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ja">
   <head>
-    <title><%= [ content_for(:title), "mcp-sandbox-app" ].compact.join(" — ") %></title>
+    <title><%= [ content_for(:title), "mcp-coderunner-app" ].compact.join(" — ") %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
@@ -20,7 +20,7 @@
   <body>
     <% if Current.user %>
       <header class="bar">
-        <span class="bar-mark">mcp-sandbox-app</span>
+        <span class="bar-mark">mcp-coderunner-app</span>
 
         <nav>
           <%= link_to "ジョブ", admin_jobs_path, "aria-current": ("page" if controller_path == "admin/jobs") %>

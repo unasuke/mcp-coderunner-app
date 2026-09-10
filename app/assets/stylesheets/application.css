@@ -1,5 +1,5 @@
 /*
- * mcp-sandbox-app の管理画面。
+ * mcp-coderunner-app の管理画面。
  *
  * 主役は Dockerfile と実行結果。等幅は機械が出した値（digest・パス・exit code・
  * ログ）にだけ使い、ラベルの飾りには使わない。

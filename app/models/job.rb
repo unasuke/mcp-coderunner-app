@@ -1,8 +1,8 @@
 class Job < ApplicationRecord
   STATES = %w[ pending_review rejected queued leased running finished ].freeze
   # 検証用のスクリプトは普通は数 KB に収まる。これを超えている時点で何か変なことが起きている
-  def self.review_script_bytes = Rails.configuration.x.mcp_sandbox_app.script_review_bytes
-  def self.max_script_bytes = Rails.configuration.x.mcp_sandbox_app.script_max_bytes
+  def self.review_script_bytes = Rails.configuration.x.mcp_coderunner_app.script_review_bytes
+  def self.max_script_bytes = Rails.configuration.x.mcp_coderunner_app.script_max_bytes
 
   # 既定値は pending_review。state の設定を書き忘れたジョブは実行されずに止まる
   enum :state, STATES.index_by(&:itself), default: "pending_review"

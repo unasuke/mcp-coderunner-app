@@ -1,4 +1,4 @@
-namespace :mcp_sandbox_app do
+namespace :mcp_coderunner_app do
   namespace :worker do
     desc "development 用のワーカートークンを tmp/worker_token に用意する（冪等）"
     task dev_token: :environment do

@@ -1,16 +1,16 @@
 <% content_for :title, "ログイン" %>
 
 <div class="gate">
-  <h1>mcp-sandbox-app</h1>
+  <h1>mcp-coderunner-app</h1>
   <p>Dockerfile とスクリプトを、隔離したコンテナで実行する仕組みの管理画面です。</p>
 
   <%= button_to "GitHub でログイン", github_auth_path, method: :post, class: "btn-go", data: { turbo: false } %>
 
-  <% if Rails.configuration.x.mcp_sandbox_app.allow_developer_login %>
+  <% if Rails.configuration.x.mcp_coderunner_app.allow_developer_login %>
     <hr>
     <p>
       開発用のログイン口が開いています。
-      <code class="mono"><%= Rails.configuration.x.mcp_sandbox_app.bootstrap_admin_login %></code>
+      <code class="mono"><%= Rails.configuration.x.mcp_coderunner_app.bootstrap_admin_login %></code>
       と入れると管理者、ほかの名前は承認待ちになります。
     </p>
     <%= button_to "GitHub を経由せずにログイン", "/auth/developer", method: :post, data: { turbo: false } %>

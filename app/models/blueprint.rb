@@ -4,10 +4,10 @@ class Blueprint < ApplicationRecord
   STATES = %w[ pending_review approved rejected revoked ].freeze
   NAME_FORMAT = /\A[a-z0-9][a-z0-9._-]{0,63}\z/
 
-  def self.max_dockerfile_bytes = Rails.configuration.x.mcp_sandbox_app.dockerfile_max_bytes
-  def self.max_context_bytes = Rails.configuration.x.mcp_sandbox_app.context_max_bytes
-  def self.max_files = Rails.configuration.x.mcp_sandbox_app.max_context_files
-  def self.list_limit = Rails.configuration.x.mcp_sandbox_app.blueprint_list_limit
+  def self.max_dockerfile_bytes = Rails.configuration.x.mcp_coderunner_app.dockerfile_max_bytes
+  def self.max_context_bytes = Rails.configuration.x.mcp_coderunner_app.context_max_bytes
+  def self.max_files = Rails.configuration.x.mcp_coderunner_app.max_context_files
+  def self.list_limit = Rails.configuration.x.mcp_coderunner_app.blueprint_list_limit
 
   enum :state, STATES.index_by(&:itself), default: "pending_review"
 

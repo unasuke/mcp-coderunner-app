@@ -8,7 +8,7 @@
   <% if @processes.empty? %>
     <div class="empty">
       <p>動いているワーカーがありません。投入したジョブは待ち行列に溜まったままになります。</p>
-      <p>VM で <code class="mono">systemctl status mcp-sandbox-app-worker</code> を確認してください。</p>
+      <p>VM で <code class="mono">systemctl status mcp-coderunner-app-worker</code> を確認してください。</p>
     </div>
   <% else %>
     <div class="rows-scroll">
@@ -55,7 +55,7 @@
       <p class="warn">
         サーバー側の実装は <%= commit_label(@server_commit) %> です。
         ずれているインスタンスは、VM で <code class="mono">git pull</code> して
-        <code class="mono">systemctl restart mcp-sandbox-app-worker</code> してください。
+        <code class="mono">systemctl restart mcp-coderunner-app-worker</code> してください。
         実行は止まりませんが、挙動が食い違うことがあります。
       </p>
     <% end %>

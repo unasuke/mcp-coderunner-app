@@ -13,7 +13,7 @@ module WorkerTestHelper
   def build_policy(**overrides)
     Worker::Policy.new(
       worker_id: "test-worker",
-      endpoint: "https://mcp-sandbox-app.invalid",
+      endpoint: "https://mcp-coderunner-app.invalid",
       limits: overrides.delete(:limits),
       runtime_dir: overrides.delete(:runtime_dir),
       **overrides

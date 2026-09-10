@@ -134,7 +134,7 @@ module Worker
     end
 
     def container_name(payload)
-      "mcp-sandbox-app-#{payload.job_id}-#{payload.lease_id}"
+      "mcp-coderunner-app-#{payload.job_id}-#{payload.lease_id}"
     end
 
     def start_stats(container)
