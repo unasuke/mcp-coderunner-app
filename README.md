@@ -57,6 +57,15 @@ MCPRB_E2E=1 ruby -Ilib -I. worker/test/e2e_test.rb
 | `BOOTSTRAP_ADMIN_GITHUB_LOGIN` | 最初のログインで admin になるログイン名 |
 | `KAMAL_VERSION` | デプロイしたリビジョン。ワーカーとのずれの検知に使う |
 
+## 開発用ログイン
+
+development では `config/mcprb.yml` の `allow_developer_login` が true になっており、
+`/login` に「GitHub を経由せずにログイン」が出る。`dev` と入れると admin、
+ほかの名前は pending になるので、承認待ちの経路も試せる。
+
+**認可の中心（member 以上のセッションからしか認可コードを出さない）を迂回する口なので、
+本番では絶対に true にしない。** 無効な環境では `/auth/developer` ごと生えない。
+
 ## デプロイ
 
 VPS は Kamal、ワーカーは systemd。`docs/worker-setup.md` を参照。
