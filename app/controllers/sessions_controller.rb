@@ -15,7 +15,7 @@ class SessionsController < ApplicationController
   # GitHub を経由しない開発用の口。設定で許可された環境にしか無い。
   # ストラテジが生えていなければ omniauth.auth も来ないので、二重に閉じている。
   def developer
-    return head(:not_found) unless Rails.configuration.x.mcprb.allow_developer_login
+    return head(:not_found) unless Rails.configuration.x.mcp_sandbox_app.allow_developer_login
 
     sign_in_with(request.env.fetch("omniauth.auth"))
   end
@@ -53,7 +53,7 @@ class SessionsController < ApplicationController
   end
 
   def bootstrap_admin?(login)
-    expected = Rails.configuration.x.mcprb.bootstrap_admin_login
+    expected = Rails.configuration.x.mcp_sandbox_app.bootstrap_admin_login
     expected.present? && expected == login
   end
 end

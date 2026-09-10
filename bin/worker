@@ -20,8 +20,8 @@ require "worker/runner"
 
 module Worker
   class Agent
-    DEFAULT_CONFIG = "/etc/mcprb/config.yml"
-    DEFAULT_REVISION = "/opt/mcprb/REVISION"
+    DEFAULT_CONFIG = "/etc/mcp-sandbox-app/config.yml"
+    DEFAULT_REVISION = "/opt/mcp-sandbox-app/REVISION"
     BACKOFF_MAX = 30
 
     def initialize(config_path:, revision_path:)

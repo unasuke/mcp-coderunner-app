@@ -1,4 +1,4 @@
-# mcprb
+# mcp-sandbox-app
 
 任意の Dockerfile とスクリプトを受け取り、リソース制限下のコンテナで実行する MCP サーバー。
 Ractor の挙動確認やベンチマークを、手元の環境を汚さずに回すためのもの。
@@ -36,7 +36,7 @@ ruby -Ilib -I. -e 'require "worker/runner"'
 ruby -Ilib -I. worker/test/policy_test.rb
 
 # docker を実際に回す E2E（遅い）
-MCPRB_E2E=1 ruby -Ilib -I. worker/test/e2e_test.rb
+MCP_SANDBOX_APP_E2E=1 ruby -Ilib -I. worker/test/e2e_test.rb
 ```
 
 `bin/mcp_stdio` は Claude Desktop から stdio で繋いで単発実行するためのもの。
@@ -44,7 +44,7 @@ MCPRB_E2E=1 ruby -Ilib -I. worker/test/e2e_test.rb
 ```json
 {
   "mcpServers": {
-    "mcprb-local": { "command": "/path/to/mcp-sandbox-app/bin/mcp_stdio" }
+    "mcp-sandbox-app-local": { "command": "/path/to/mcp-sandbox-app/bin/mcp_stdio" }
   }
 }
 ```
@@ -53,14 +53,14 @@ MCPRB_E2E=1 ruby -Ilib -I. worker/test/e2e_test.rb
 
 | 変数 | 用途 |
 |---|---|
-| `MCPRB_BASE_URL` | 公開 URL。review_url と OAuth のメタデータに使う |
+| `MCP_SANDBOX_APP_BASE_URL` | 公開 URL。review_url と OAuth のメタデータに使う |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub ログイン |
 | `BOOTSTRAP_ADMIN_GITHUB_LOGIN` | 最初のログインで admin になるログイン名 |
 | `KAMAL_VERSION` | デプロイしたリビジョン。ワーカーとのずれの検知に使う |
 
 ## 開発用ログイン
 
-development では `config/mcprb.yml` の `allow_developer_login` が true になっており、
+development では `config/mcp_sandbox_app.yml` の `allow_developer_login` が true になっており、
 `/login` に「GitHub を経由せずにログイン」が出る。`dev` と入れると admin、
 ほかの名前は pending になるので、承認待ちの経路も試せる。
 

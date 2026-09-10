@@ -21,8 +21,8 @@ module McpSandboxApp
     # These settings can be overridden in specific environments using the files
     # in config/environments, which are processed later.
     #
-    # 設定値は config/mcprb.yml に置き、Rails.configuration.x.mcprb から読む
-    config.x.mcprb = config_for(:mcprb)
+    # 設定値は config/mcp_sandbox_app.yml に置き、Rails.configuration.x.mcp_sandbox_app から読む
+    config.x.mcp_sandbox_app = config_for(:mcp_sandbox_app)
 
     # config.time_zone = "Central Time (US & Canada)"
     # config.eager_load_paths << Rails.root.join("extras")

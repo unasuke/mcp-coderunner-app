@@ -40,7 +40,7 @@ env:
     - GITHUB_CLIENT_SECRET
   clear:
     # review_url と OAuth のメタデータに使う公開 URL
-    MCPRB_BASE_URL: https://mcprb.example.com
+    MCP_SANDBOX_APP_BASE_URL: https://mcp-sandbox-app.example.com
 
     # GitHub ログイン。read:user だけ要求する
     GITHUB_CLIENT_ID: ""

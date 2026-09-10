@@ -3,7 +3,7 @@ module Admin
     def index
       @workers = Worker.order(:created_at)
       @processes = WorkerProcess.where(stopped_at: nil).order(started_at: :desc)
-      @server_commit = Rails.configuration.x.mcprb.commit_hash
+      @server_commit = Rails.configuration.x.mcp_sandbox_app.commit_hash
     end
 
     # 平文はその場で 1 度だけ表示する。DB に入るのは SHA256 だけなので、閉じたら二度と見られない

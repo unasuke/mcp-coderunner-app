@@ -134,7 +134,7 @@ module Worker
     end
 
     def container_name(payload)
-      "mcprb-#{payload.job_id}-#{payload.lease_id}"
+      "mcp-sandbox-app-#{payload.job_id}-#{payload.lease_id}"
     end
 
     def start_stats(container)

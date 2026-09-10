@@ -40,7 +40,7 @@
         <td>
           <code><%= process.commit_hash.first(8) %></code>
           <% if process.commit_hash != @server_commit %>
-            <strong>サーバーとずれています。VM で git pull して systemctl restart mcprb-worker してください</strong>
+            <strong>サーバーとずれています。VM で git pull して systemctl restart mcp-sandbox-app-worker してください</strong>
           <% end %>
         </td>
         <td><%= process.ruby_version %></td>

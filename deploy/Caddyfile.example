@@ -12,7 +12,7 @@
 	}
 }
 
-mcprb.example.com {
+mcp-sandbox-app.example.com {
 	encode zstd gzip
 
 	# Anthropic のクラウドからのみ到達できる面

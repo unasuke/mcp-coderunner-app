@@ -24,7 +24,7 @@ module Worker
       "max_images" => 40
     }.freeze
 
-    DEFAULT_RUNTIME_DIR = "/run/mcprb"
+    DEFAULT_RUNTIME_DIR = "/run/mcp-sandbox-app"
 
     MAX_PATH_LENGTH = 255
 

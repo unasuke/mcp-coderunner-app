@@ -4,7 +4,7 @@
 # トランスポートを SDK に寄せておくと、protocol version のネゴシエーションやセッションの
 # 扱いといった、仕様追従が必要で自分では検証しにくい部分を持たずに済む。
 module McpServerBuilder
-  NAME = "mcprb"
+  NAME = "mcp-sandbox-app"
   VERSION = "0.1.0"
 
   TOOLS = [

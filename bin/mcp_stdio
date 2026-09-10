@@ -99,7 +99,7 @@ module McpStdio
   end
 end
 
-options = { config: nil, runtime_dir: File.join(Dir.tmpdir, "mcprb") }
+options = { config: nil, runtime_dir: File.join(Dir.tmpdir, "mcp-sandbox-app") }
 OptionParser.new do |parser|
   parser.banner = "Usage: bin/mcp_stdio [options]"
   parser.on("--config PATH", "worker の設定ファイル（省略時は既定値で動く）") { |v| options[:config] = v }
@@ -114,7 +114,7 @@ McpStdio::RunTool.policy =
   end
 
 server = MCP::Server.new(
-  name: "mcprb-local",
+  name: "mcp-sandbox-app-local",
   title: "Ruby exec sandbox (local)",
   version: "0.1.0",
   instructions: "任意の Dockerfile 上で Ruby スクリプトを隔離実行する。ベンチマークや Ractor の挙動確認向け。",

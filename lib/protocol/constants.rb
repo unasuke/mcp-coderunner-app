@@ -33,10 +33,10 @@ module Protocol
     DEFAULT_ENTRYPOINT = [ "ruby", SCRIPT_PATH ].freeze
 
     # 孤児コンテナを回収するための目印
-    CONTAINER_LABEL = "mcprb.job"
+    CONTAINER_LABEL = "mcp-sandbox-app.job"
 
     # ビルドしたイメージのタグ。digest をそのままタグにする
-    IMAGE_REPO = "mcprb/bp"
+    IMAGE_REPO = "mcp-sandbox-app/bp"
 
     # /deregister の理由
     DEREGISTER_REASONS = %w[ shutdown update drained ].freeze

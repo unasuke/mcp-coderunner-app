@@ -29,12 +29,12 @@ class McpTest < ActionDispatch::IntegrationTest
     post "/mcp", as: :json, params: { jsonrpc: "2.0", id: 1, method: "tools/list" }
 
     assert_response :unauthorized
-    assert_match %r{resource_metadata="http://mcprb.invalid/\.well-known/oauth-protected-resource"},
+    assert_match %r{resource_metadata="http://mcp-sandbox-app.invalid/\.well-known/oauth-protected-resource"},
       response.headers["WWW-Authenticate"]
   end
 
   test "initialize and tools/list" do
-    assert_equal "mcprb", rpc("initialize", {
+    assert_equal "mcp-sandbox-app", rpc("initialize", {
       protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1" }
     }).dig("result", "serverInfo", "name")
 
@@ -163,14 +163,14 @@ class McpTest < ActionDispatch::IntegrationTest
     get "/.well-known/oauth-protected-resource"
 
     assert_response :success
-    assert_equal "http://mcprb.invalid/mcp", response.parsed_body["resource"]
+    assert_equal "http://mcp-sandbox-app.invalid/mcp", response.parsed_body["resource"]
 
     get "/.well-known/oauth-authorization-server"
 
     assert_response :success
     assert_equal [ "S256" ], response.parsed_body["code_challenge_methods_supported"]
     assert_equal [ "mcp" ], response.parsed_body["scopes_supported"]
-    assert_equal "http://mcprb.invalid/oauth/register", response.parsed_body["registration_endpoint"]
+    assert_equal "http://mcp-sandbox-app.invalid/oauth/register", response.parsed_body["registration_endpoint"]
   end
 
   # 既定スコープを満たさないトークンは 403 を JSON で返す（HTML のエラーページにしない）
@@ -214,12 +214,12 @@ class McpTest < ActionDispatch::IntegrationTest
     get "/.well-known/oauth-protected-resource/mcp"
 
     assert_response :success
-    assert_equal "http://mcprb.invalid/mcp", response.parsed_body["resource"]
+    assert_equal "http://mcp-sandbox-app.invalid/mcp", response.parsed_body["resource"]
 
     get "/.well-known/oauth-authorization-server/mcp"
 
     assert_response :success
-    assert_equal "http://mcprb.invalid", response.parsed_body["issuer"]
+    assert_equal "http://mcp-sandbox-app.invalid", response.parsed_body["issuer"]
   end
 
   test "dynamic client registration refuses a plaintext redirect_uri" do

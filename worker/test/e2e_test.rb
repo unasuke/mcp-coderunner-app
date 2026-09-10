@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# 実際に docker を回す唯一のテスト。MCPRB_E2E=1 のときだけ走る。
+# 実際に docker を回す唯一のテスト。MCP_SANDBOX_APP_E2E=1 のときだけ走る。
 #
 # 1 本に絞るのは遅いからだけではなく、壊れたときに原因が 1 箇所に絞れる粒度を保つため。
 # 見ているのは 2 つ、--network none が効いていることと、cgroup から統計が取れること。
@@ -22,7 +22,7 @@ class E2eTest < Minitest::Test
   SH
 
   def setup
-    skip "set MCPRB_E2E=1 to run" unless ENV["MCPRB_E2E"] == "1"
+    skip "set MCP_SANDBOX_APP_E2E=1 to run" unless ENV["MCP_SANDBOX_APP_E2E"] == "1"
   end
 
   def test_builds_runs_and_reports

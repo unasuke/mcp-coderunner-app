@@ -1,5 +1,5 @@
 [Unit]
-Description=mcprb image prune (daily)
+Description=mcp-sandbox-app image prune (daily)
 
 [Timer]
 OnCalendar=daily

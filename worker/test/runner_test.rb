@@ -7,14 +7,14 @@ class RunnerTest < Minitest::Test
   include WorkerTestHelper
 
   def setup
-    @policy = build_policy(runtime_dir: "/tmp/mcprb-test")
+    @policy = build_policy(runtime_dir: "/tmp/mcp-sandbox-app-test")
     @runner = Worker::Runner.new(policy: @policy)
   end
 
   def args(payload: build_payload, applied: nil)
     applied ||= @policy.clamp(payload.limits)
-    @runner.run_args(payload, applied:, tag: "mcprb/bp:#{payload.blueprint.digest}",
-      workdir: "/run/mcprb/1042/work", container: "mcprb-1042-88")
+    @runner.run_args(payload, applied:, tag: "mcp-sandbox-app/bp:#{payload.blueprint.digest}",
+      workdir: "/run/mcp-sandbox-app/1042/work", container: "mcp-sandbox-app-1042-88")
   end
 
   def pair(list, flag)
@@ -53,11 +53,11 @@ class RunnerTest < Minitest::Test
   end
 
   def test_mounts_the_work_directory_read_only
-    assert_equal "/run/mcprb/1042/work:/work:ro", pair(args, "--volume")
+    assert_equal "/run/mcp-sandbox-app/1042/work:/work:ro", pair(args, "--volume")
   end
 
   def test_labels_the_container_for_orphan_cleanup
-    assert_equal "mcprb.job=1042", pair(args, "--label")
+    assert_equal "mcp-sandbox-app.job=1042", pair(args, "--label")
   end
 
   def test_entrypoint_comes_last_and_defaults_to_ruby
@@ -72,7 +72,7 @@ class RunnerTest < Minitest::Test
     payload = build_payload
     list = args(payload:)
 
-    assert_equal "mcprb/bp:#{payload.blueprint.digest}", list[list.index("ruby") - 1]
+    assert_equal "mcp-sandbox-app/bp:#{payload.blueprint.digest}", list[list.index("ruby") - 1]
   end
 
   # bench は cpuset でピン留めして他のジョブと排他にする
@@ -81,7 +81,7 @@ class RunnerTest < Minitest::Test
       limits: { "memory_mb" => 4096, "cpus" => 4, "pids" => 1024, "timeout_s" => 300, "tmpfs_mb" => 1024 })
     policy = build_policy(limits: { "max_cpus" => 4, "max_memory_mb" => 4096, "max_tmpfs_mb" => 1024 })
     list = Worker::Runner.new(policy:).run_args(payload, applied: policy.clamp(payload.limits),
-      tag: "mcprb/bp:x", workdir: "/w", container: "c")
+      tag: "mcp-sandbox-app/bp:x", workdir: "/w", container: "c")
 
     assert_equal "0-3", pair(list, "--cpuset-cpus")
   end

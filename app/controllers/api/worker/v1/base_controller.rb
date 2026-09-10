@@ -18,7 +18,7 @@ module Api
         end
 
         def server_commit
-          Rails.configuration.x.mcprb.commit_hash
+          Rails.configuration.x.mcp_sandbox_app.commit_hash
         end
 
         # 会話が成立するかどうか。合わなければ lease を止める

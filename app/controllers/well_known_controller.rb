@@ -31,10 +31,10 @@ class WellKnownController < ActionController::API
   private
 
   def issuer
-    Rails.configuration.x.mcprb.base_url.to_s.chomp("/")
+    Rails.configuration.x.mcp_sandbox_app.base_url.to_s.chomp("/")
   end
 
   def url_for_path(path)
-    URI.join(Rails.configuration.x.mcprb.base_url, path).to_s
+    URI.join(Rails.configuration.x.mcp_sandbox_app.base_url, path).to_s
   end
 end

@@ -1,14 +1,14 @@
-<h1>mcprb</h1>
+<h1>mcp-sandbox-app</h1>
 
 <p>Ruby 実行 MCP サーバーの管理画面です。</p>
 
 <%= button_to "GitHub でログイン", "/auth/github", method: :post, data: { turbo: false } %>
 
-<% if Rails.configuration.x.mcprb.allow_developer_login %>
+<% if Rails.configuration.x.mcp_sandbox_app.allow_developer_login %>
   <hr>
   <p>
     開発用のログイン口が有効になっています（<code>allow_developer_login</code>）。
-    <code><%= Rails.configuration.x.mcprb.bootstrap_admin_login %></code> と入れると admin、
+    <code><%= Rails.configuration.x.mcp_sandbox_app.bootstrap_admin_login %></code> と入れると admin、
     ほかの名前は pending になります。
   </p>
   <%= button_to "GitHub を経由せずにログイン", "/auth/developer", method: :post, data: { turbo: false } %>

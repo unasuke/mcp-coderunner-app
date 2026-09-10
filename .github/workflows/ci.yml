@@ -74,7 +74,7 @@ jobs:
       # cgroup から統計が取れることを見る
       - name: Run the docker end-to-end test
         env:
-          MCPRB_E2E: "1"
+          MCP_SANDBOX_APP_E2E: "1"
         run: ruby -Ilib -I. worker/test/e2e_test.rb
 
   test:
