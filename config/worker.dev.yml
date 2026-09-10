@@ -1,0 +1,15 @@
+# bin/dev から起動する開発用のワーカー設定。
+# トークンは bin/rails mcprb:worker:dev_token が tmp/worker_token に置く。
+worker_id: dev
+endpoint: http://localhost:3000
+token_file: tmp/worker_token
+
+# リポジトリ内の tmp を使う（gitignore 済み）。docker に渡すときは絶対パスに直る
+runtime_dir: tmp/mcprb
+
+limits:
+  max_concurrency: 1
+
+build:
+  cache_ttl_days: 14
+  max_images: 20

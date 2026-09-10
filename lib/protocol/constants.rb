@@ -13,6 +13,11 @@ module Protocol
     # worker heartbeat と job heartbeat の間隔（秒）
     HEARTBEAT_INTERVAL = 30
 
+    # /lease のロングポーリングの中で queued を探す間隔（秒）。
+    # ここを詰めるほど enqueue から実行開始までが速くなるが、そのぶん
+    # 空振りの問い合わせと last_heartbeat_at の更新が増える
+    LEASE_POLL_INTERVAL = 3
+
     # この時間 heartbeat が無い instance は死んだとみなす（秒）。間隔の 4 倍
     HEARTBEAT_EXPIRY = 120
 

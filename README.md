@@ -27,6 +27,7 @@ docs/worker-setup.md VM 側のセットアップ手順
 
 ```sh
 bin/setup            # 依存インストール + db:prepare + 開発サーバ
+bin/dev              # web + js + worker（ワーカーのトークンは初回に自動発行される）
 bin/rails test       # Rails 側のテスト
 bin/ci               # lint・セキュリティ・テストを一通り
 

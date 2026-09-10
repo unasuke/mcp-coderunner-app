@@ -55,7 +55,11 @@ module Worker
       self
     end
 
+    # cgroup のパスが解決できていない（コンテナが先に終わって /proc から消えた、
+    # 権限が無い）ときは何もしない。統計が取れないことは実行の失敗ではない
     def sample
+      return self unless @base
+
       @mutex.synchronize do
         read_cpu_time
         read_memory

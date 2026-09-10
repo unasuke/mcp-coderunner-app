@@ -50,7 +50,8 @@ module Worker
       @token_file = token_file
       @limits = DEFAULT_LIMITS.merge(limits || {})
       @build = DEFAULT_BUILD.merge(build || {})
-      @runtime_dir = runtime_dir || DEFAULT_RUNTIME_DIR
+      # docker の -v は相対パスを受け付けないので、ここで絶対パスにしておく
+      @runtime_dir = ::File.expand_path(runtime_dir || DEFAULT_RUNTIME_DIR)
     end
 
     # systemd の LoadCredential= で渡された場合はそちらを優先する。

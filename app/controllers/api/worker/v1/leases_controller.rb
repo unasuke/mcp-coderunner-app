@@ -24,17 +24,20 @@ module Api
         private
 
         # 通知の仕組みには乗せない。SQLite に LISTEN/NOTIFY 相当が無く、
-        # Solid Queue の経路に載せても結局どこかでポーリングになる
+        # Solid Queue の経路に載せても結局どこかでポーリングになる。
+        #
+        # beat! はリクエストにつき 1 回でよい。ロングポーリングを掴んでいること
+        # 自体が生存の証拠であり、失効の閾値（2 分）に対して窓は 25 秒しかない。
         def wait_for_job(process)
           deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + Protocol::Constants::LEASE_WAIT
+          process.beat!
 
           loop do
-            process.beat!
             claimed = Jobs::Claim.call(instance_id: process.instance_id)
             return claimed if claimed
             return nil if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
 
-            sleep 1
+            sleep Protocol::Constants::LEASE_POLL_INTERVAL
           end
         end
 

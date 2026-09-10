@@ -90,6 +90,18 @@ class RunnerTest < Minitest::Test
     refute_includes args, "--cpuset-cpus"
   end
 
+  # ワーカーのバグで例外が漏れても、結果は必ず返す
+  def test_unexpected_errors_come_back_as_worker_error
+    builder = Object.new
+    def builder.ensure_image!(**) = raise(TypeError, "boom")
+    runner = Worker::Runner.new(policy: @policy, builder:)
+
+    result = runner.call(build_payload)
+
+    assert_equal "worker_error", result.termination_reason
+    assert_includes result.stderr, "TypeError: boom"
+  end
+
   # VPS から来た識別子をそのままパスとコンテナ名に使うので、形を確かめてから使う
   def test_rejects_identifiers_that_are_not_numeric
     payload = build_payload

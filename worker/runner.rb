@@ -43,6 +43,10 @@ module Worker
       failure("image_build_failed", e, applied, started)
     rescue Error, SystemCallError, JSON::ParserError => e
       failure("worker_error", e, applied, started)
+    rescue StandardError => e
+      # ここが最後の砦。ワーカーのバグで例外が漏れると、結果が返らずジョブが
+      # 宙吊りになり、リースが失効するまで誰も気づけない
+      failure("worker_error", e, applied, started)
     end
 
     private
@@ -185,7 +189,7 @@ module Worker
     def failure(reason, error, applied, started)
       Protocol::JobResult.new(
         termination_reason: reason,
-        stderr: error.message,
+        stderr: "#{error.class}: #{error.message}",
         duration_ms: elapsed_ms(started),
         applied_limits: applied || {}
       )

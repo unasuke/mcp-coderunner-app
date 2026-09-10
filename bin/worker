@@ -12,6 +12,7 @@ require "optparse"
 require "securerandom"
 require "socket"
 require "protocol/constants"
+require "protocol/job_result"
 require "worker/client"
 require "worker/docker"
 require "worker/policy"
@@ -61,17 +62,30 @@ module Worker
       end
     end
 
+    # サーバーがまだ起きていないことがある（bin/dev で並べて起動する場合など）。
+    # 落ちて再起動を待つより、繋がるまで待つほうが素直。
     def register
-      response = @client.register(
-        instance_id: @instance_id,
-        commit_hash: @commit_hash,
-        capacity: @policy.max_concurrency,
-        hostname: Socket.gethostname,
-        pid: Process.pid,
-        ruby_version: RUBY_VERSION,
-        docker_version: docker_version
-      )
-      log("register", instance_id: @instance_id, outdated: response["outdated"])
+      backoff = 1
+
+      begin
+        response = @client.register(
+          instance_id: @instance_id,
+          commit_hash: @commit_hash,
+          capacity: @policy.max_concurrency,
+          hostname: Socket.gethostname,
+          pid: Process.pid,
+          ruby_version: RUBY_VERSION,
+          docker_version: docker_version
+        )
+        log("register", instance_id: @instance_id, outdated: response["outdated"])
+      rescue Error => e
+        raise unless @running
+
+        log("register.failed", error: e.message, backoff:)
+        sleep backoff
+        backoff = [ backoff * 2, BACKOFF_MAX ].min
+        retry
+      end
     end
 
     def deregister
@@ -104,7 +118,7 @@ module Worker
 
       while @running
         if @draining || busy?
-          sleep 1
+          sleep Protocol::Constants::LEASE_POLL_INTERVAL
           next
         end
 
@@ -148,11 +162,28 @@ module Worker
       accepted = client.post_result(job_id: payload.job_id, lease_token: payload.lease_token, result:)
       log("job.finish", job_id: payload.job_id, reason: result.termination_reason,
         exit_code: result.exit_code, duration_ms: result.duration_ms, accepted:)
-    rescue Error => e
-      log("job.failed", job_id: payload.job_id, error: e.message)
+    rescue StandardError => e
+      # 結果を返さずに終わると、リースが失効するまでジョブが宙吊りになる
+      log("job.failed", job_id: payload.job_id, error: "#{e.class}: #{e.message}")
+      report_worker_error(client, payload, e)
     ensure
       client&.close
       @mutex.synchronize { @jobs.delete(payload.job_id) }
+    end
+
+    def report_worker_error(client, payload, error)
+      return unless client
+
+      client.post_result(
+        job_id: payload.job_id,
+        lease_token: payload.lease_token,
+        result: Protocol::JobResult.new(
+          termination_reason: "worker_error",
+          stderr: "#{error.class}: #{error.message}"
+        )
+      )
+    rescue StandardError => e
+      log("job.result.failed", job_id: payload.job_id, error: "#{e.class}: #{e.message}")
     end
 
     # 最初の 1 回はすぐ打つ。サーバーはこれを受け取って state を running に移す。

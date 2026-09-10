@@ -53,4 +53,13 @@ class CgroupStatsTest < Minitest::Test
   def test_missing_process_resolves_to_no_base
     assert_nil Worker::CgroupStats.resolve_base(999_999_999)
   end
+
+  # コンテナが即座に終わると /proc から消える。そこで落ちるとジョブが宙吊りになる
+  def test_start_and_stop_are_safe_without_a_resolvable_cgroup
+    stats = Worker::CgroupStats.new(999_999_999)
+
+    assert_same stats, stats.start
+    assert_same stats, stats.stop
+    assert_nil stats.cpu_time_ms
+  end
 end
