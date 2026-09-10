@@ -32,8 +32,16 @@ shared:
   github_client_id: <%= ENV["GITHUB_CLIENT_ID"] %>
   github_client_secret: <%= ENV["GITHUB_CLIENT_SECRET"] %>
 
+  # GitHub を経由せずにログインできる開発用の口。
+  # これは認可の中心（member 以上のセッションからしか認可コードを出さない）を
+  # 迂回する。**本番で true にしない。** 有効な環境では /auth/developer が生える
+  allow_developer_login: false
+
 # config_for が shared を各環境にマージする
 development:
+  allow_developer_login: true
+  # 開発用ログインでこの名前を入れると admin になる。ほかの名前は pending のまま
+  bootstrap_admin_login: dev
 
 test:
   base_url: http://mcprb.invalid

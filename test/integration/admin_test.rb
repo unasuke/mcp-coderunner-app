@@ -21,6 +21,21 @@ class AdminTest < ActionDispatch::IntegrationTest
     User.find_by(github_uid: uid).update!(role:)
   end
 
+  # 本番相当の設定では開発用ログインの口が存在しない。
+  # これは認可の中心を迂回する口なので、設定が無効なら経路ごと消えていること
+  test "the developer login is absent unless it is explicitly allowed" do
+    refute Rails.configuration.x.mcprb.allow_developer_login
+
+    post "/auth/developer"
+
+    assert_response :not_found
+
+    post "/auth/developer/callback", params: { nickname: "dev" }
+
+    assert_response :not_found
+    assert_nil Current.user
+  end
+
   test "the first login becomes admin when it matches the bootstrap login" do
     Rails.configuration.x.mcprb.bootstrap_admin_login = "unasuke"
     OmniAuth.config.mock_auth[:github] = OmniAuth::AuthHash.new(

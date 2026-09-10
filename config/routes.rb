@@ -12,6 +12,9 @@ Rails.application.routes.draw do
   get "login" => "sessions#new", as: :login
   post "auth/github", as: :github_auth
   get "auth/github/callback" => "sessions#create"
+  # 開発用ログインのコールバック（OmniAuth のフォームから POST で来る）。
+  # 設定が無効なら 404 を返す。ストラテジ自体も生えないので二重に閉じている
+  match "auth/developer/callback" => "sessions#developer", via: [ :get, :post ]
   get "auth/failure" => "sessions#failure"
   delete "logout" => "sessions#destroy", as: :logout
   get "pending" => "sessions#pending", as: :pending

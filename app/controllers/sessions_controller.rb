@@ -1,21 +1,23 @@
 class SessionsController < ApplicationController
+  # 開発用ログインのコールバックは OmniAuth が生成したフォームから POST で来るので、
+  # Rails の authenticity token を持たない。この口自体が設定で塞がっている前提で外す。
+  skip_before_action :verify_authenticity_token, only: :developer
+
   def new
     render :new
   end
 
-  # 初回ログイン時、bootstrap の 1 人目だけが admin になる。
-  # 以降の新規ログインは全員 pending で、できることは何もない。
+  # GitHub からのコールバック
   def create
-    auth = request.env.fetch("omniauth.auth")
-    user = User.find_or_initialize_by(github_uid: auth.uid.to_s)
-    user.assign_attributes(login: auth.info.nickname, name: auth.info.name, avatar_url: auth.info.image)
-    user.role = :admin if user.new_record? && bootstrap_admin?(auth.info.nickname)
-    user.save!
+    sign_in_with(request.env.fetch("omniauth.auth"))
+  end
 
-    _session, token = Session.issue!(user:, user_agent: request.user_agent, ip_address: request.remote_ip)
-    cookies.signed[:session_token] = { value: token, httponly: true, same_site: :lax, secure: request.ssl? }
+  # GitHub を経由しない開発用の口。設定で許可された環境にしか無い。
+  # ストラテジが生えていなければ omniauth.auth も来ないので、二重に閉じている。
+  def developer
+    return head(:not_found) unless Rails.configuration.x.mcprb.allow_developer_login
 
-    redirect_to(session.delete(:return_to) || root_path)
+    sign_in_with(request.env.fetch("omniauth.auth"))
   end
 
   def failure
@@ -35,6 +37,20 @@ class SessionsController < ApplicationController
   end
 
   private
+
+  # 初回ログイン時、bootstrap の 1 人目だけが admin になる。
+  # 以降の新規ログインは全員 pending で、できることは何もない。
+  def sign_in_with(auth)
+    user = User.find_or_initialize_by(github_uid: auth.uid.to_s)
+    user.assign_attributes(login: auth.info.nickname, name: auth.info.name, avatar_url: auth.info.image)
+    user.role = :admin if user.new_record? && bootstrap_admin?(auth.info.nickname)
+    user.save!
+
+    _session, token = Session.issue!(user:, user_agent: request.user_agent, ip_address: request.remote_ip)
+    cookies.signed[:session_token] = { value: token, httponly: true, same_site: :lax, secure: request.ssl? }
+
+    redirect_to(session.delete(:return_to) || root_path)
+  end
 
   def bootstrap_admin?(login)
     expected = Rails.configuration.x.mcprb.bootstrap_admin_login
