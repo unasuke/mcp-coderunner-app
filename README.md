@@ -63,3 +63,7 @@ development では `config/mcp_sandbox_app.yml` の `allow_developer_login` が 
 
 VPS は Kamal、ワーカーは systemd。`docs/worker-setup.md` を参照。
 既存の Caddy が 80/443 を持つ前提で、Kamal 側の proxy は無効にしてある。
+
+## ライセンス
+
+MIT License（[LICENSE](LICENSE)）
