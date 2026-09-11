@@ -14,14 +14,14 @@ servers:
     # said at the role level (a top-level proxy: configures the proxy itself)
     proxy: false
     options:
-      publish: [ "127.0.0.1:3000:80" ]
+      publish: [ "127.0.0.1:7000:80" ]
   # job:
   #   hosts:
   #     - 192.168.0.1
   #   cmd: bin/jobs
 
 # The container publishes to a fixed port on localhost, and Caddy picks it up with
-# reverse_proxy localhost:3000. Certificates are left to Caddy's automatic HTTPS
+# reverse_proxy localhost:7000. Certificates are left to Caddy's automatic HTTPS
 # （deploy/Caddyfile.example）。
 
 # The image is built locally or in CI and pushed; the server only pulls.

@@ -70,7 +70,8 @@ The VPS runs under Kamal; the worker runs under systemd (`docs/worker-setup.md`)
 
 The image is **built locally or in CI and pushed to ghcr.io, and the server only
 pulls**. Nothing is built on the VPS. An existing Caddy owns 80/443, so kamal-proxy
-is disabled.
+is disabled: the container publishes to `127.0.0.1:7000` and Caddy reaches it with
+`reverse_proxy localhost:7000` (`deploy/Caddyfile.example`).
 
 **The real address and hostname are not in this repository.** `config/deploy.yml`
 reads them from the environment variables below: from your shell when you deploy by

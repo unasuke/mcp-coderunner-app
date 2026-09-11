@@ -8,7 +8,7 @@
 		# Refused with a 404 rather than a 403, so that an MCP endpoint being here is not itself news
 		@blocked not remote_ip {$ANTHROPIC_RANGES}
 		respond @blocked 404
-		reverse_proxy localhost:3000
+		reverse_proxy localhost:7000
 	}
 }
 
@@ -28,26 +28,26 @@ mcp-coderunner-app.example.com {
 
 	# From a browser. The gate is require_member! in the application
 	handle /oauth/authorize* {
-		reverse_proxy localhost:3000
+		reverse_proxy localhost:7000
 	}
 	handle /admin* {
-		reverse_proxy localhost:3000
+		reverse_proxy localhost:7000
 	}
 	handle /login* {
-		reverse_proxy localhost:3000
+		reverse_proxy localhost:7000
 	}
 	handle /auth/* {
-		reverse_proxy localhost:3000
+		reverse_proxy localhost:7000
 	}
 
 	# From the worker. With a static address at home, narrow this too
 	handle /api/worker/* {
-		reverse_proxy localhost:3000
+		reverse_proxy localhost:7000
 	}
 
 	# The metadata stays public (RFC 9728 / RFC 8414)
 	handle {
-		reverse_proxy localhost:3000
+		reverse_proxy localhost:7000
 	}
 }
 
