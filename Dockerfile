@@ -74,6 +74,14 @@ RUN rm -rf node_modules
 # Final stage for app image
 FROM base
 
+# image.source is what ties the package to the repository on ghcr.io: access follows
+# the repository's, and making the repository public offers the package alongside it.
+# Pushing with GITHUB_TOKEN usually links it anyway, but a push from a laptop with a
+# PAT does not, and the image should not depend on where it was built.
+LABEL org.opencontainers.image.source="https://github.com/unasuke/mcp-coderunner-app" \
+      org.opencontainers.image.description="MCP server that runs Ruby scripts in resource-limited containers" \
+      org.opencontainers.image.licenses="MIT"
+
 # Run and own only the runtime files as a non-root user for security
 RUN groupadd --system --gid 1000 rails && \
     useradd rails --uid 1000 --gid 1000 --create-home --shell /bin/bash
