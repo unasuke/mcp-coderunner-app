@@ -195,13 +195,58 @@ class McpTest < ActionDispatch::IntegrationTest
     assert_equal "http://mcp-coderunner-app.invalid/oauth/register", response.parsed_body["registration_endpoint"]
   end
 
+  # 権限の判定をトークンの寿命（15 分）に任せない。revoke を経ない経路
+  # （コンソールからの直接更新など）でも、その場で止まること
+  test "a live token is refused once the user is no longer a member" do
+    assert_equal 4, rpc("tools/list").dig("result", "tools").size
+
+    @user.update!(role: :pending)
+
+    post "/mcp", headers: { "Authorization" => "Bearer #{@token.plaintext_token}" }, as: :json,
+      params: { jsonrpc: "2.0", id: 1, method: "tools/list" }
+
+    assert_response :forbidden
+    assert_equal "forbidden", response.parsed_body["error"]
+  end
+
+  # 管理画面からの降格はトークンごと切る
+  test "demotion revokes the tokens, so refreshing does not get a new one" do
+    @user.approve!(by: @user, role: :pending)
+
+    assert_predicate @token.reload, :revoked?
+
+    post "/mcp", headers: { "Authorization" => "Bearer #{@token.plaintext_token}" }, as: :json,
+      params: { jsonrpc: "2.0", id: 1, method: "tools/list" }
+
+    assert_response :unauthorized
+  end
+
+  test "a revoked refresh token cannot be exchanged" do
+    refresh = Doorkeeper::AccessToken.create!(
+      application: @application, resource_owner_id: @user.id, expires_in: 900,
+      scopes: Doorkeeper.config.default_scopes.to_s, use_refresh_token: true
+    )
+
+    @user.approve!(by: @user, role: :pending)
+
+    assert_predicate refresh.reload, :revoked?
+
+    post "/oauth/token", params: {
+      grant_type: "refresh_token", refresh_token: refresh.plaintext_refresh_token,
+      client_id: @application.uid
+    }
+
+    assert_response :bad_request
+    assert_equal "invalid_grant", response.parsed_body["error"]
+  end
+
   # 既定スコープを満たさないトークンは 403 を JSON で返す（HTML のエラーページにしない）
   test "a token without the scope is forbidden" do
     scopeless = Doorkeeper::AccessToken.create!(
       application: @application, resource_owner_id: @user.id, expires_in: 900, scopes: ""
     )
 
-    post "/mcp", headers: { "Authorization" => "Bearer #{scopeless.token}" }, as: :json,
+    post "/mcp", headers: { "Authorization" => "Bearer #{scopeless.plaintext_token}" }, as: :json,
       params: { jsonrpc: "2.0", id: 1, method: "tools/list" }
 
     assert_response :forbidden

@@ -15,6 +15,16 @@ class User < ApplicationRecord
 
   def approve!(by:, role: :member)
     update!(role:, approved_by: by, approved_at: Time.current)
-    sessions.destroy_all unless can_use_mcp?
+    return if can_use_mcp?
+
+    # 使えなくしたなら、ブラウザのセッションだけでなく MCP のトークンも切る。
+    # 昇格のときは触らない
+    sessions.destroy_all
+    revoke_oauth_access!
+  end
+
+  def revoke_oauth_access!
+    Doorkeeper::AccessToken.where(resource_owner_id: id, revoked_at: nil).find_each(&:revoke)
+    Doorkeeper::AccessGrant.where(resource_owner_id: id, revoked_at: nil).find_each(&:revoke)
   end
 end

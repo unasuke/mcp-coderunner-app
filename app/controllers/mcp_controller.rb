@@ -4,6 +4,7 @@
 class McpController < ActionController::API
   before_action :doorkeeper_authorize!
   before_action :set_current
+  before_action :require_member!
 
   def create
     body = McpServerBuilder.build.handle_json(request.raw_post)
@@ -24,6 +25,17 @@ class McpController < ActionController::API
   end
 
   private
+
+  # トークンが有効でも、降格されたユーザーや消えたユーザーは通さない。
+  # 権限の判定をトークンの寿命（15 分）に任せない
+  def require_member!
+    return if Current.user&.can_use_mcp?
+
+    render json: {
+      error: "forbidden",
+      message: "このアカウントはこのサーバーを使えません。管理者の承認が要ります"
+    }, status: :forbidden
+  end
 
   def set_current
     Current.user = doorkeeper_token&.resource_owner_id&.then { |id| User.find_by(id:) }
