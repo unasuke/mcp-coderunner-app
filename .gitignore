@@ -38,3 +38,9 @@
 !/app/assets/builds/.keep
 
 /node_modules
+
+# rails new's Dockerfile does COPY vendor/* , so the directory has to exist in a
+# fresh checkout -- and Kamal builds from a clone of HEAD, not the working tree.
+# Un-ignore it here in case a global ignore covers /vendor/, and keep the bundle out.
+!/vendor/
+/vendor/bundle/
