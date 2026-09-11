@@ -31,6 +31,10 @@ bin/dev              # web + js + worker (the worker's token is issued on first 
 bin/rails test       # the Rails-side tests
 bin/ci               # lint, security, and the full test suite
 
+# Templates go through Herb (ReActionView). This is the HTML-aware linter,
+# and bin/ci runs it too.
+bundle exec herb lint "app/views/**/*.html.erb"
+
 # The worker does not load Rails. Run it with plain ruby.
 ruby -Ilib -I. -e 'require "worker/runner"'
 ruby -Ilib -I. worker/test/policy_test.rb

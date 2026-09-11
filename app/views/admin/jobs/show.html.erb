@@ -2,7 +2,7 @@
 
 <% live = !(@job.finished? || @job.rejected?) %>
 
-<div class="sheet" <%= tag.attributes(data: { controller: "refresh" }) if live %>>
+<div class="sheet" <% if live %><%= tag.attributes(data: { controller: "refresh" }) %><% end %>>
   <h1>
     ジョブ #<%= @job.id %>
     <span class="h1-sub">
@@ -40,8 +40,9 @@
     <% end %>
   </dl>
 
+  <h2>結果</h2>
+
   <% if @result %>
-    <h2>結果</h2>
     <dl class="facts">
       <dt>終了理由</dt>
       <dd><%= outcome_tag(@result) %> <span class="mono">exit <%= @result.exit_code.inspect %></span></dd>
@@ -83,7 +84,6 @@
       <% end %>
     </div>
   <% elsif @job.pending_review? %>
-    <h2>結果</h2>
     <div class="empty">
       <p>承認するまで実行されません。</p>
       <p>プロファイルが <code class="mono">default</code> でない、スクリプトが 64KB を超える、実行環境が未承認、のいずれかに当たっています。</p>
@@ -96,7 +96,6 @@
       <% end %>
     </div>
   <% else %>
-    <h2>結果</h2>
     <div class="empty">
       <p>まだ結果が届いていません。ワーカーが拾って実行しています。</p>
     </div>

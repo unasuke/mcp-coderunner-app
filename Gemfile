@@ -82,3 +82,6 @@ group :test do
 end
 
 gem "rouge", "~> 5.1"
+
+gem "reactionview", "~> 0.4.1"
+gem "herb", "~> 0.10.4"

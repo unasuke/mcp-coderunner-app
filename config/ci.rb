@@ -4,6 +4,9 @@ CI.run do
   step "Setup", "bin/setup --skip-server"
 
   step "Style: Ruby", "bin/rubocop"
+  # Herb parses HTML+ERB as HTML, so it catches what RuboCop cannot see:
+  # unclosed tags, output in attribute position, duplicated branches
+  step "Style: Templates", "bundle exec herb lint \"app/views/**/*.html.erb\""
 
   step "Security: Gem audit", "bin/bundler-audit"
   step "Security: Yarn vulnerability audit", "yarn audit"

@@ -50,6 +50,15 @@ jobs:
       - name: Lint code for consistent style
         run: bin/rubocop -f github
 
+      # herb lint runs the linter from node_modules, pinned there and in .herb.yml
+      - name: Install JavaScript dependencies
+        run: yarn install --frozen-lockfile
+
+      # HTML-aware, so it sees what RuboCop cannot: unclosed tags, output in
+      # attribute position, branches that repeat the same element
+      - name: Lint templates
+        run: bundle exec herb lint "app/views/**/*.html.erb"
+
   worker:
     runs-on: ubuntu-latest
 
