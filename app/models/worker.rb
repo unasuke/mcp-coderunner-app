@@ -10,10 +10,18 @@ class Worker < ApplicationRecord
 
   scope :active, -> { where(revoked_at: nil) }
 
-  # 平文はその場で 1 度だけ表示する。DB に入るのは SHA256 だけなので、閉じたら二度と見られない
+  # 平文はその場で 1 度だけ表示する。DB に入るのは SHA256 だけなので、閉じたら二度と見られない。
+  # 無くしたら再発行する。行は増やさず、同じ worker_id のダイジェストを差し替える
+  # （過去の worker_processes と leases がこの行を指しているため）
   def self.issue!(worker_id:)
     token = SecureRandom.urlsafe_base64(TOKEN_BYTES)
-    worker = create!(worker_id:, token_digest: digest(token))
+    worker = find_or_initialize_by(worker_id:)
+    worker.token_digest = digest(token)
+    # 失効させた worker_id に再発行したら、新しいトークンで使えるようにする。
+    # 古いトークンはダイジェストが変わった時点で通らない
+    worker.revoked_at = nil
+    worker.save!
+
     [ worker, token ]
   end
 

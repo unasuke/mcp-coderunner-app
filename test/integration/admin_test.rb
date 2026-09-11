@@ -195,6 +195,30 @@ class AdminTest < ActionDispatch::IntegrationTest
     assert_equal Worker.digest(flash[:issued_token]), worker.token_digest
   end
 
+  # 平文は 1 度しか出ない。無くしたら再発行する。行は増やさない
+  test "issuing a token again rotates it in place" do
+    sign_in
+    worker, first = Worker.issue!(worker_id: "home-vm-01")
+
+    assert_difference -> { Worker.count }, 0 do
+      post admin_workers_path, params: { worker_id: "home-vm-01" }
+    end
+
+    assert_nil Worker.authenticate(first)
+    assert_equal worker, Worker.authenticate(flash[:issued_token])
+  end
+
+  test "re-issuing brings a revoked worker back with a new token" do
+    sign_in
+    _worker, old_token = Worker.issue!(worker_id: "home-vm-01")
+    Worker.find_by(worker_id: "home-vm-01").revoke!
+
+    post admin_workers_path, params: { worker_id: "home-vm-01" }
+
+    assert_nil Worker.authenticate(old_token)
+    assert_predicate Worker.authenticate(flash[:issued_token]), :present?
+  end
+
   test "promoting a user drops their sessions when they lose access" do
     sign_in
     other = User.create!(github_uid: "2", login: "someone", role: :member)
