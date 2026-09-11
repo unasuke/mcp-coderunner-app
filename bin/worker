@@ -15,6 +15,7 @@ require "protocol/constants"
 require "protocol/job_result"
 require "worker/client"
 require "worker/docker"
+require "worker/job_registry"
 require "worker/policy"
 require "worker/runner"
 
@@ -24,41 +25,42 @@ module Worker
     DEFAULT_REVISION = "/opt/mcp-coderunner-app/REVISION"
     BACKOFF_MAX = 30
 
+    # 実行中のジョブを待つ上限。unit の TimeoutStopSec=90 の内側に収める
+    SHUTDOWN_GRACE = 60
+
     def initialize(config_path:, revision_path:)
       @policy = Policy.load(config_path)
       @commit_hash = read_revision(revision_path)
       @instance_id = SecureRandom.uuid_v7
       @client = Client.new(policy: @policy)
-      @running = true
+      @jobs = JobRegistry.new(max_concurrency: @policy.max_concurrency)
+      @leasing = true
+      @beating = true
       @draining = false
-      @jobs = {}
-      @mutex = Mutex.new
     end
 
     def run
       trap_signals
       register
-      heartbeat_thread = start_heartbeat
+      heartbeat = start_heartbeat
       lease_loop
-      heartbeat_thread.kill
-      shutdown
+
+      # 終了の順序は「新規 lease を止める → 実行中のコンテナを片付ける →
+      # /deregister」。コンテナを落とす前に離脱を通知すると、サーバーが再投入した
+      # ジョブと古いコンテナが並走する
+      drain_jobs
+      stop_heartbeat(heartbeat)
+      deregister
+      @client.close
       0
     end
 
     private
 
-    # 終了処理の順序は「新規 lease を止める → 実行中のコンテナを片付ける → /deregister を打つ」。
-    # コンテナを落とす前に離脱を通知すると、サーバーが再投入したジョブと古いコンテナが並走する。
-    def shutdown
-      log("shutdown.begin", jobs: @mutex.synchronize { @jobs.size })
-      @mutex.synchronize { @jobs.values }.each { |thread| thread.join(90) }
-      deregister
-      @client.close
-    end
-
+    # trap の中では flag を立てるだけにする。ロックを取ると止まりうる
     def trap_signals
       %w[ TERM INT ].each do |signal|
-        Signal.trap(signal) { @running = false }
+        Signal.trap(signal) { @leasing = false }
       end
     end
 
@@ -79,7 +81,7 @@ module Worker
         )
         log("register", instance_id: @instance_id, outdated: response["outdated"])
       rescue Error => e
-        raise unless @running
+        raise unless @leasing
 
         log("register.failed", error: e.message, backoff:)
         sleep backoff
@@ -96,28 +98,37 @@ module Worker
       log("deregister.failed", error: e.message)
     end
 
+    # 停止処理のあいだも打ち続ける。90 秒の片付け中に reaper に拾われないように、
+    # deregister の直前まで止めない
     def start_heartbeat
       Thread.new do
         client = Client.new(policy: @policy)
-        while @running
+
+        while @beating
           begin
             response = client.heartbeat(instance_id: @instance_id, commit_hash: @commit_hash)
             @draining = !!response["drain"]
           rescue Error => e
             log("heartbeat.failed", error: e.message)
           end
-          sleep Protocol::Constants::HEARTBEAT_INTERVAL
+
+          nap(Protocol::Constants::HEARTBEAT_INTERVAL) { @beating }
         end
       ensure
         client&.close
       end
     end
 
+    def stop_heartbeat(thread)
+      @beating = false
+      thread.join(5)
+    end
+
     def lease_loop
       backoff = 1
 
-      while @running
-        if @draining || busy?
+      while @leasing
+        if @draining || @jobs.busy?
           sleep Protocol::Constants::LEASE_POLL_INTERVAL
           next
         end
@@ -138,37 +149,77 @@ module Worker
       end
     end
 
-    def busy?
-      @mutex.synchronize { @jobs.size } >= @policy.max_concurrency
-    end
-
-    # ロックを握ったまま起こす。子スレッドの ensure は @jobs への登録が
-    # 済むまでロックを取れないので、登録前に削除されることがない。
     def start_job(payload)
-      @mutex.synchronize do
-        @jobs[payload.job_id] = Thread.new { run_job(payload) }
+      entry = @jobs.add(payload)
+
+      if entry.nil?
+        log("job.refused", job_id: payload.job_id, lease_id: payload.lease_id)
+        return
       end
+
+      entry.thread = Thread.new { run_job(entry) }
     end
 
-    def run_job(payload)
-      log("job.start", job_id: payload.job_id, digest: payload.blueprint.digest, profile: payload.profile)
-      client = Client.new(policy: @policy)
-      cancelled = [ false ]
-      heartbeat = start_job_heartbeat(payload, client, cancelled)
+    def run_job(entry)
+      payload = entry.payload
+      log("job.start", job_id: payload.job_id, lease_id: payload.lease_id,
+        digest: payload.blueprint.digest, profile: payload.profile)
 
-      result = Runner.new(policy: @policy).call(payload, cancelled: -> { cancelled[0] })
-      heartbeat.kill
+      # heartbeat と結果の送信で接続を共有しない。Client はスレッドセーフではない
+      heartbeat_client = Client.new(policy: @policy)
+      heartbeat = start_job_heartbeat(entry, heartbeat_client)
+      result_client = Client.new(policy: @policy)
 
-      accepted = client.post_result(job_id: payload.job_id, lease_token: payload.lease_token, result:)
+      await_exclusive_slot(entry)
+      result = Runner.new(policy: @policy).call(payload, cancelled: -> { entry.cancelled? })
+
+      # Thread#kill しない。送信の途中でソケットを壊すと結果が返らない
+      entry.stop_heartbeat!
+      heartbeat.join(5)
+
+      accepted = result_client.post_result(
+        job_id: payload.job_id, lease_token: payload.lease_token, result:
+      )
       log("job.finish", job_id: payload.job_id, reason: result.termination_reason,
         exit_code: result.exit_code, duration_ms: result.duration_ms, accepted:)
     rescue StandardError => e
       # 結果を返さずに終わると、リースが失効するまでジョブが宙吊りになる
       log("job.failed", job_id: payload.job_id, error: "#{e.class}: #{e.message}")
-      report_worker_error(client, payload, e)
+      report_worker_error(result_client, payload, e)
     ensure
-      client&.close
-      @mutex.synchronize { @jobs.delete(payload.job_id) }
+      entry.stop_heartbeat!
+      heartbeat_client&.close
+      result_client&.close
+      @jobs.delete(payload.lease_id)
+    end
+
+    # bench は他のジョブと同時に走らせない。サーバー側でも止めているが、
+    # VPS の状態がずれても測定が壊れないようにここでも待つ
+    def await_exclusive_slot(entry)
+      return unless entry.exclusive?
+
+      until @jobs.alone?(entry) || entry.cancelled?
+        log("job.waiting_for_exclusive", job_id: entry.job_id, running: @jobs.size)
+        sleep Protocol::Constants::LEASE_POLL_INTERVAL
+      end
+    end
+
+    # 最初の 1 回はすぐ打つ。サーバーはこれを受け取って state を running に移す。
+    def start_job_heartbeat(entry, client)
+      Thread.new do
+        while entry.beating?
+          begin
+            response = client.job_heartbeat(
+              job_id: entry.job_id, lease_token: entry.payload.lease_token
+            )
+            entry.cancel! if response["cancel"]
+          rescue Error => e
+            log("job.heartbeat.failed", job_id: entry.job_id, error: e.message)
+          end
+
+          nap(Protocol::Constants::HEARTBEAT_INTERVAL) { entry.beating? }
+        end
+      end
     end
 
     def report_worker_error(client, payload, error)
@@ -186,19 +237,41 @@ module Worker
       log("job.result.failed", job_id: payload.job_id, error: "#{e.class}: #{e.message}")
     end
 
-    # 最初の 1 回はすぐ打つ。サーバーはこれを受け取って state を running に移す。
-    def start_job_heartbeat(payload, client, cancelled)
-      Thread.new do
-        loop do
-          begin
-            response = client.job_heartbeat(job_id: payload.job_id, lease_token: payload.lease_token)
-            cancelled[0] = true if response["cancel"]
-          rescue Error => e
-            log("job.heartbeat.failed", job_id: payload.job_id, error: e.message)
-          end
-          sleep Protocol::Constants::HEARTBEAT_INTERVAL
-        end
+    # SIGTERM を受けたら、実行中のコンテナを落としてからでないと離脱できない
+    def drain_jobs
+      entries = @jobs.entries
+      return if entries.empty?
+
+      log("shutdown.cancelling", jobs: entries.size)
+      entries.each(&:cancel!)
+
+      deadline = monotonic + SHUTDOWN_GRACE
+      entries.each { |entry| entry.thread&.join([ deadline - monotonic, 0 ].max) }
+
+      sweep_containers
+    end
+
+    # 待っても終わらなかった分を label で片付ける。unit の起動前・停止後の掃除と同じ
+    def sweep_containers
+      listed = Docker.run("ps", "-aq", "--filter", "label=#{Protocol::Constants::CONTAINER_LABEL}")
+      containers = listed.stdout.split
+      return if containers.empty?
+
+      log("shutdown.sweep", containers: containers.size)
+      Docker.run("rm", "--force", "--volumes", *containers)
+    end
+
+    # 眠っているあいだも停止に気づけるように、細かく刻む
+    def nap(seconds)
+      seconds.times do
+        break unless yield
+
+        sleep 1
       end
+    end
+
+    def monotonic
+      Process.clock_gettime(Process::CLOCK_MONOTONIC)
     end
 
     def docker_version
