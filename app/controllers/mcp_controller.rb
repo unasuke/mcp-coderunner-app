@@ -1,6 +1,6 @@
-# MCP のリソースサーバー本体。Doorkeeper でトークンを検証し、resource owner を
-# Current に載せてから SDK のハンドラに委譲するだけにする。
-# ツールの実装から認証の存在が見えないようにしておくため。
+# The MCP resource server itself. It verifies the token through Doorkeeper, puts
+# the resource owner on Current, and hands off to the SDK's handler -- nothing more,
+# which is what keeps authentication out of sight of the tool implementations.
 class McpController < ActionController::API
   before_action :doorkeeper_authorize!
   before_action :set_current
@@ -12,13 +12,13 @@ class McpController < ActionController::API
     if body
       render plain: body, content_type: "application/json"
     else
-      # 通知（id の無いリクエスト）には返すものが無い
+      # A notification (a request without an id) has nothing to answer with
       head :accepted
     end
   end
 
-  # SSE のストリームは提供しない。仕様上、その場合は 405 を返す必要がある。
-  # ここでのセッションは持たない（stateless）ので、DELETE での終了も無い。
+  # No SSE stream is offered, and the specification calls for a 405 in that case.
+  # Nothing here holds a session either (it is stateless), so there is no DELETE to end one.
   def unsupported
     headers["Allow"] = "POST"
     render json: { error: "method_not_allowed" }, status: :method_not_allowed
@@ -26,8 +26,8 @@ class McpController < ActionController::API
 
   private
 
-  # トークンが有効でも、降格されたユーザーや消えたユーザーは通さない。
-  # 権限の判定をトークンの寿命（15 分）に任せない
+  # A valid token is not enough for a user who has been demoted or deleted.
+  # What someone is allowed to do is not left to a token's 15-minute lifetime
   def require_member!
     return if Current.user&.can_use_mcp?
 
@@ -42,7 +42,7 @@ class McpController < ActionController::API
     Current.oauth_application = doorkeeper_token&.application
   end
 
-  # RFC 9728。401 からリソースメタデータを指す
+  # RFC 9728. Points from the 401 at the resource metadata
   def doorkeeper_unauthorized_render_options(error: nil)
     metadata = URI.join(Rails.configuration.x.mcp_coderunner_app.base_url, "/.well-known/oauth-protected-resource").to_s
     headers["WWW-Authenticate"] = %(Bearer realm="mcp-coderunner-app", resource_metadata="#{metadata}")
@@ -50,7 +50,7 @@ class McpController < ActionController::API
     { json: { error: "unauthorized", message: error&.description } }
   end
 
-  # スコープ不足。API なので HTML のエラーページではなく JSON で返す
+  # Insufficient scope. This is an API, so it answers in JSON rather than an HTML error page
   def doorkeeper_forbidden_render_options(error: nil)
     { json: { error: "forbidden", message: error&.description } }
   end

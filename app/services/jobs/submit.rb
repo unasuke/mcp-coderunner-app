@@ -1,10 +1,11 @@
 module Jobs
-  # ジョブの投入。実行は待たない。
+  # Submits a job. It does not wait for the run.
   #
-  # Blueprint が approved なら queued から始まる。以下のいずれかなら pending_review に入る。
-  #   - Blueprint が approved でない
-  #   - profile が default 以外
-  #   - script が 64KB を超える
+  # On an approved Blueprint the job starts queued. Any of the following puts it
+  # in pending_review instead:
+  #   - the Blueprint is not approved
+  #   - the profile is something other than default
+  #   - the script is over 64KB
   class Submit
     DIGEST_FORMAT = /\A[0-9a-f]{64}\z/
 
@@ -49,8 +50,9 @@ module Jobs
         "script が大きすぎます: #{@script.bytesize} バイト（上限 #{Job.max_script_bytes}）")
     end
 
-    # 一度人間が断った内容は、digest を知っていても投げ直せない。
-    # revoked が止めるのは新規投入なので、キューに残っているものには影響しない
+    # Content a human has turned down cannot be submitted again by anyone holding
+    # the digest. Revoking stops new submissions, so what is already queued is
+    # left alone
     def reject_withdrawn!(blueprint)
       return unless blueprint.rejected? || blueprint.revoked?
 
@@ -59,7 +61,7 @@ module Jobs
         review_note: blueprint.review_note)
     end
 
-    # digest ならそのまま引く。name なら同名で最新の approved を使う
+    # A digest is looked up as-is. A name resolves to the newest approved row under it
     def resolve_blueprint
       if @blueprint_ref.match?(DIGEST_FORMAT)
         Blueprint.find_by(digest: @blueprint_ref) ||

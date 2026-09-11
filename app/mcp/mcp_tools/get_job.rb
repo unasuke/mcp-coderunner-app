@@ -21,7 +21,7 @@ module McpTools
       payload = { job_id: job.id, state: job.state, profile: job.profile,
                   blueprint_digest: job.blueprint.digest }
       payload[:review_url] = review_url("/admin/jobs/#{job.id}") if job.pending_review?
-      # 保持期間を過ぎたことが応答から読めれば、結果が空なのを実行の失敗と誤読しない
+      # With retention visible in the response, an empty result is not misread as a failed run
       payload[:purged_at] = job.purged_at.utc.iso8601 if job.purged?
 
       result = job.job_result
@@ -36,7 +36,7 @@ module McpTools
         applied_limits: result.applied_limits
       )
 
-      # 本文は保持期間で消える。終了理由は消さない
+      # The body goes with retention. How the job ended does not
       return payload if job.purged?
 
       payload.merge(

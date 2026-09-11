@@ -1,26 +1,28 @@
 class SessionsController < ApplicationController
-  # 開発用ログインのコールバックは OmniAuth が生成したフォームから POST で来るので、
-  # Rails の authenticity token を持たない。この口自体が設定で塞がっている前提で外す。
+  # The developer sign-in's callback is POSTed from a form OmniAuth generated, so it
+  # carries no Rails authenticity token. Skipping it rests on the door itself being
+  # shut by configuration.
   skip_before_action :verify_authenticity_token, only: :developer
 
   def new
     render :new
   end
 
-  # GitHub からのコールバック
+  # The callback from GitHub
   def create
     sign_in_with(request.env.fetch("omniauth.auth"))
   end
 
-  # GitHub を経由しない開発用の口。設定で許可された環境にしか無い。
-  # ストラテジが生えていなければ omniauth.auth も来ないので、二重に閉じている。
+  # The development door that skips GitHub. It exists only where configuration
+  # allows it. Without the strategy registered nothing sets omniauth.auth either,
+  # so it is shut twice over.
   def developer
     return head(:not_found) unless Rails.configuration.x.mcp_coderunner_app.allow_developer_login
 
     sign_in_with(request.env.fetch("omniauth.auth"))
   end
 
-  # OmniAuth が GitHub のストラテジを持っていないとここに落ちてくる
+  # Where the request lands when OmniAuth has no GitHub strategy registered
   def github
     redirect_to login_path,
       alert: "GitHub ログインが設定されていません。GITHUB_CLIENT_ID と GITHUB_CLIENT_SECRET を入れて再起動してください"
@@ -37,15 +39,15 @@ class SessionsController < ApplicationController
     redirect_to login_path
   end
 
-  # 承認待ち画面。pending のユーザーはここで止まる
+  # The waiting-for-approval page, where a pending user stops
   def pending
     redirect_to(root_path) if current_user&.can_use_mcp?
   end
 
   private
 
-  # 初回ログイン時、bootstrap の 1 人目だけが admin になる。
-  # 以降の新規ログインは全員 pending で、できることは何もない。
+  # On a first sign-in, only the bootstrap login becomes admin.
+  # Every new sign-in after that is pending, and can do nothing at all.
   def sign_in_with(auth)
     user = User.find_or_initialize_by(github_uid: auth.uid.to_s)
     user.assign_attributes(login: auth.info.nickname, name: auth.info.name, avatar_url: auth.info.image)

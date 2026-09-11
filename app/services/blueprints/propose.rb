@@ -1,6 +1,7 @@
 module Blueprints
-  # 提案は冪等な操作として扱う。同じ digest が既にあれば新規作成せずその行を返す。
-  # digest に name を含めないので、名前だけ違う同一内容もここに落ちる。
+  # Proposing is treated as idempotent: an existing digest returns that row rather
+  # than creating another. Since name is not part of the digest, identical content
+  # under a different name lands here too.
   class Propose
     Result = Data.define(:blueprint, :created)
 
@@ -20,7 +21,7 @@ module Blueprints
 
       digest = Blueprint.digest_for(dockerfile: @dockerfile, files: @files)
       existing = Blueprint.find_by(digest:)
-      # name は既存の行のものを返す。新しい名前で既存レコードを上書きしない
+      # The name that comes back is the existing row's. A new name does not overwrite it
       return Result.new(blueprint: existing, created: false) if existing
 
       Result.new(blueprint: create!(digest), created: true)
@@ -42,7 +43,8 @@ module Blueprints
 
     def create!(digest)
       Blueprint.create!(
-        # 同じ名前の直前の版に繋ぐ。/admin が差分でレビューできるようにする
+        # Chained to the previous revision under the same name, which is what lets
+        # /admin review it as a diff
         parent: Blueprint.where(name: @name).order(created_at: :desc).first,
         name: @name,
         summary: @summary,

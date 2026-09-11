@@ -1,4 +1,4 @@
-# ツールの共通部分。1 ツール 1 ファイルで McpTools 以下に置く。
+# What the tools share. One tool per file, under McpTools.
 module McpTools
   class Base < MCP::Tool
     class << self
@@ -14,7 +14,7 @@ module McpTools
         respond({ error: "invalid_input", message: e.record.errors.full_messages.join(", ") }, error: true)
       end
 
-      # review_url を返すことで、人間に「ここを見てほしい」と伝えられる
+      # Returning a review_url is how the model points a human at what to look at
       def review_url(path)
         URI.join(Rails.configuration.x.mcp_coderunner_app.base_url, path).to_s
       end

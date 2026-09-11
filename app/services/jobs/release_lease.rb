@@ -1,17 +1,18 @@
 module Jobs
-  # リースを解放してジョブの行き先を決める。
+  # Releases a lease and decides where the job goes next.
   #
-  # /deregister（正常な再起動）は試行回数を見ずに queued に戻す。更新のたびに
-  # 走りかけのジョブが捨てられるのは実用的でない。失効した場合だけ回数を見る。
+  # /deregister -- an orderly restart -- requeues without looking at the attempt
+  # count. Throwing away whatever was mid-flight on every update is no way to run
+  # this. The count only matters when a lease actually expired.
   class ReleaseLease
     def self.call(lease:, reason:, requeue_always: false)
-      # SQLite は書き込みを直列化するので、1 トランザクションに入れれば足りる。
-      # 解放と state の移動が別々に見えると、二重に requeue されうる
+      # SQLite serializes writes, so one transaction is enough. With the release
+      # and the state change visible separately, a job could be requeued twice
       Job.transaction do
         held = Lease.find(lease.id)
         job = held.job
 
-        # 既に解放済みなら何もしない。reaper と /deregister が同時に来ても二重に動かさない
+        # Already released: do nothing. The reaper and /deregister arriving together act once
         next job unless held.active?
 
         held.release!(reason)
@@ -22,7 +23,7 @@ module Jobs
       end
     end
 
-    # 中断を要求されたジョブを queued に戻すと、止めたはずのものが走り直す
+    # Requeuing a job someone asked to stop would start the stopped thing over again
     def self.decide(job, requeue_always)
       if job.cancel_requested?
         job.finish_with!(

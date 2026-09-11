@@ -18,8 +18,8 @@ class ApplicationController < ActionController::Base
     Current.user
   end
 
-  # /oauth/authorize と /admin の関門。
-  # 未ログインなら GitHub へ、pending なら承認待ち画面で止める。
+  # The gate in front of /oauth/authorize and /admin.
+  # Not signed in goes to GitHub; pending stops at the waiting-for-approval page.
   def require_member!
     return if current_user&.can_use_mcp?
 
@@ -37,8 +37,8 @@ class ApplicationController < ActionController::Base
     require_member! || head(:forbidden)
   end
 
-  # Doorkeeper の resource_owner_authenticator から呼ばれる。
-  # 認可できないときはリダイレクトして nil を返すと、Doorkeeper がそこで止まる。
+  # Called from Doorkeeper's resource_owner_authenticator.
+  # Redirecting and returning nil is how Doorkeeper is told to stop here.
   def authenticate_resource_owner_for_oauth
     return current_user if current_user&.can_use_mcp?
 

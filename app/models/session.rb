@@ -3,7 +3,7 @@ class Session < ApplicationRecord
 
   belongs_to :user
 
-  # cookie に入れる平文はここでしか手に入らない。DB には SHA256 だけ残す
+  # This is the only place the plaintext for the cookie exists. Only the SHA256 is kept
   def self.issue!(user:, user_agent: nil, ip_address: nil)
     token = SecureRandom.urlsafe_base64(TOKEN_BYTES)
     session = create!(

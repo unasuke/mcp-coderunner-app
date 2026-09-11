@@ -1,8 +1,8 @@
 class Blueprint < ApplicationRecord
   InvalidTransition = Class.new(StandardError)
 
-  # draft は持たない。Blueprint が生まれる経路は propose_blueprint だけで、
-  # 提案された時点でレビュー待ちになる
+  # There is no draft. propose_blueprint is the only way a Blueprint comes into
+  # being, and it is waiting for review from the moment it is proposed
   STATES = %w[ pending_review approved rejected revoked ].freeze
   NAME_FORMAT = /\A[a-z0-9][a-z0-9._-]{0,63}\z/
 
@@ -30,8 +30,8 @@ class Blueprint < ApplicationRecord
 
   accepts_nested_attributes_for :blueprint_files
 
-  # name は unique ではない。改訂のたびに parent_id で連なる別レコードができるので、
-  # 同じ name の行は複数存在する
+  # name is not unique. Every revision makes another record chained by parent_id,
+  # so rows sharing a name are expected
   scope :latest_approved, ->(name) { approved.where(name:).order(created_at: :desc) }
 
   def self.digest_for(dockerfile:, files:)
@@ -45,7 +45,8 @@ class Blueprint < ApplicationRecord
     )
   end
 
-  # 遷移はサーバー側で閉じる。revoked に POST しても approved には戻らない
+  # Transitions are closed on the server. POSTing at something revoked will not
+  # walk it back to approved
   def reviewable?
     pending_review?
   end
@@ -66,7 +67,7 @@ class Blueprint < ApplicationRecord
     update!(state: :rejected, reviewed_by: by, reviewed_at: Time.current, review_note: note)
   end
 
-  # revoked が止めるのは新規投入だけ。既に queued に入っているジョブは走る
+  # Revoking stops new submissions only. A job already queued still runs
   def revoke!(by:, note: nil)
     raise InvalidTransition, "blueprint is #{state}" unless revocable?
 

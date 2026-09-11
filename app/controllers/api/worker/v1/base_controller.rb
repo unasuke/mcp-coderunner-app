@@ -1,8 +1,9 @@
 module Api
   module Worker
     module V1
-      # ワーカーのトークンで叩けるのは lease / heartbeat / result のみ。
-      # ジョブ投入の口はここに存在しない。投入は MCP エンドポイント経由の一本だけ。
+      # A worker's token reaches lease, heartbeat and result, and nothing else.
+      # There is no way to submit a job here. Submission goes through the MCP
+      # endpoint, and only there.
       class BaseController < ActionController::API
         before_action :authenticate_worker!
 
@@ -21,7 +22,7 @@ module Api
           Rails.configuration.x.mcp_coderunner_app.commit_hash
         end
 
-        # 会話が成立するかどうか。合わなければ lease を止める
+        # Whether the two sides can still hold a conversation. If not, leasing stops
         def protocol_matches?
           params[:protocol_version].to_i == Protocol::Constants::PROTOCOL_VERSION
         end

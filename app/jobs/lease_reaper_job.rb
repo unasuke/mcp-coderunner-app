@@ -1,10 +1,10 @@
-# 10 秒ごとに 2 つを走査する。
+# Sweeps two things every 10 seconds.
 #
-#   1. heartbeat が途絶えた worker_processes を死んだものとみなし、
-#      その instance が持っていたリースを即座に失効させる
-#   2. 期限切れのリースを回収する
+#   1. worker_processes whose heartbeat has stopped are taken as dead, and every
+#      lease that instance held expires at once
+#   2. leases past their expiry are collected
 #
-# 1 があると、ワーカーがクラッシュしたときにリースのタイムアウトを待たずに済む。
+# The first is what saves waiting out a lease timeout when a worker crashes.
 class LeaseReaperJob < ApplicationJob
   queue_as :default
 

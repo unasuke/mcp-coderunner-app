@@ -8,8 +8,9 @@ class BlueprintFile < ApplicationRecord
 
   private
 
-  # 展開する側ではなく、書き出す側でも弾く（ワーカー側の検証は残す）。
-  # ここで弾けるものは、人間がレビューして承認する前に落としておく
+  # Refused where the files are written rather than where they are unpacked (the
+  # worker's own check stays). Whatever can be caught here is caught before a
+  # human ever reviews and approves it
   def path_stays_in_the_context
     return if path.blank?
 

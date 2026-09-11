@@ -1,6 +1,7 @@
 module AdminHelper
-  # 状態は語と色で示す。色は意味から引く（承認・正常＝松、人待ち＝黄土、
-  # 失敗と取り消し＝鉄錆、稼働中＝藍）
+  # A state is shown as a word and a color, and the color comes from the meaning:
+  # pine for approved and healthy, ochre for waiting on a person, iron-rust for
+  # failed and withdrawn, indigo for in flight
   TONES = {
     "approved" => "go", "member" => "go", "admin" => "go", "exited" => "go",
     "pending_review" => "wait", "pending" => "wait",
@@ -18,7 +19,7 @@ module AdminHelper
     tag.span(value, class: "state state-#{tone || TONES.fetch(value.to_s, 'mute')}")
   end
 
-  # 正常終了でも exit_code が 0 でなければ失敗として見せる
+  # Ran to completion, but a non-zero exit_code still reads as a failure
   def outcome_tag(result)
     return tag.span("—", class: "dim") unless result
 
@@ -32,7 +33,7 @@ module AdminHelper
     tag.time(relative_time(time), datetime: time.iso8601, title: time.strftime("%Y-%m-%d %H:%M:%S"))
   end
 
-  # rails-i18n を入れずに済ませる。未来の時刻（リースの期限）も同じ形で出る
+  # Avoids pulling in rails-i18n. A time in the future (a lease's expiry) reads the same way
   def relative_time(time, now = Time.current)
     seconds = (now - time).round
     suffix = seconds.negative? ? "後" : "前"
@@ -51,12 +52,12 @@ module AdminHelper
     tag.span(value.to_s.first(length), class: "mono", title: value)
   end
 
-  # ボタンは押したときに何が起きるかを書く
+  # A button says what pressing it does
   def role_action_label(role)
     { "pending" => "承認待ちに戻す", "member" => "member にする", "admin" => "admin にする" }.fetch(role, role)
   end
 
-  # リビジョンらしきものだけ短縮する。"development" を "developm" と出さない
+  # Only shorten what looks like a revision, so "development" does not read "developm"
   def commit_label(value)
     return tag.span("—", class: "dim") if value.blank?
 
@@ -69,7 +70,8 @@ module AdminHelper
     number_to_human_size(value)
   end
 
-  # 上部バーに出すワーカーの生存。ジョブが queued のまま動かない原因の大半がこれ
+  # Whether a worker is alive, shown in the top bar. It is behind most cases of a
+  # job sitting in queued
   def worker_pulse
     process = WorkerProcess.alive.order(:last_heartbeat_at).last
     return state_tag("ワーカー不在", tone: "stop") unless process

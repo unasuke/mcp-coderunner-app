@@ -21,7 +21,8 @@ module Admin
       redirect_to admin_job_path(@job), notice: "承認しました"
     end
 
-    # 却下は実行環境の状態を問わない。承認できないジョブを溜めたままにしない
+    # Rejecting does not care what state the Blueprint is in, so jobs that can never
+    # be approved do not pile up
     def reject
       return redirect_to(admin_job_path(@job), alert: "却下できる状態ではありません") unless @job.pending_review?
 

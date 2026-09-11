@@ -1,9 +1,9 @@
 module Oauth
-  # RFC 7591 Dynamic Client Registration。Doorkeeper が持っていないので自前で足す。
+  # RFC 7591 Dynamic Client Registration. Doorkeeper does not ship it, so it is here.
   #
-  # 発行するのは public クライアント（client_secret を出さない）で、PKCE を必須にする。
-  # Claude 側が secret を安全に保持できるかどうかに依存させない。認可の関門は
-  # /oauth/authorize の require_member! であって、client の秘密ではない。
+  # What gets registered is a public client -- no client_secret is issued -- and PKCE
+  # is required. Nothing rests on whether the client can keep a secret safely. The
+  # gate is require_member! in front of /oauth/authorize, not the client's secret.
   class RegistrationsController < ActionController::API
     def create
       redirect_uris = Array(params[:redirect_uris]).map(&:to_s).reject(&:blank?)
@@ -37,7 +37,7 @@ module Oauth
       }
     end
 
-    # ループバック以外の平文 HTTP は受け付けない
+    # Plain HTTP is refused anywhere but loopback
     def valid_redirect_uri?(uri)
       parsed = URI.parse(uri)
       return true if parsed.scheme == "https"

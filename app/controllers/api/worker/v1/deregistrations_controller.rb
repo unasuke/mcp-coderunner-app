@@ -1,8 +1,8 @@
 module Api
   module Worker
     module V1
-      # 正常終了時の明示的な離脱。冪等にする。
-      # 同じ instance_id で二度来ても、未知の instance_id が来ても 200 を返す。
+      # An orderly departure, stated outright, and idempotent.
+      # The same instance_id twice, or one nobody has heard of, both answer 200.
       class DeregistrationsController < BaseController
         def create
           process = find_process
@@ -16,8 +16,9 @@ module Api
 
         private
 
-        # result を POST した時点でリースは外れるので、離脱時に残っているリースは
-        # 定義上「中断されたジョブ」になる。正常な再起動なので試行回数は見ずに queued へ戻す
+        # A lease comes off the moment its result is POSTed, so a lease still held at
+        # departure is by definition a job that got interrupted. This is an orderly
+        # restart, so it goes back to queued without the attempt count being consulted
         def release_leases(process)
           Lease.active.held_by(process.instance_id).map do |lease|
             Jobs::ReleaseLease.call(lease:, reason: "deregistered", requeue_always: true).id

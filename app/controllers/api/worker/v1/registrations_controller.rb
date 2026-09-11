@@ -2,8 +2,9 @@ module Api
   module Worker
     module V1
       class RegistrationsController < BaseController
-        # worker_id はベアラトークンから引く。body の worker_id は照合にだけ使う。
-        # クライアントの自己申告で別のワーカーになりすませないようにするため。
+        # The worker_id comes from the bearer token; the one in the body is only
+        # compared against it, so that nothing a client says about itself can pass
+        # it off as a different worker.
         def create
           if params[:worker_id].present? && params[:worker_id] != current_worker.worker_id
             return render json: { error: "worker_id mismatch" }, status: :unauthorized
@@ -21,13 +22,15 @@ module Api
 
         private
 
-        # 同じ worker_id の古い行があれば、その場で死んだものとして片付ける。
-        # 後述の掃除を待たない。再起動直後にジョブが宙吊りのまま残るのを避けるため。
+        # An older row under the same worker_id is put to rest here and now, rather
+        # than waiting for the sweep, so that a job is not left hanging right after
+        # a restart.
         #
-        # ここは異常終了の受け皿なので expired として数える。正常停止なら
-        # /deregister が先に通っていて、そちらは試行回数を見ずに queued へ戻す。
-        # requeue_always にすると、Restart=always のクラッシュループが同じジョブを
-        # 無限に拾い続ける（/deregister は呼ばれないので回数が増えない）
+        # This is where an unclean exit lands, so it counts as expired. A clean stop
+        # would have gone through /deregister first, and that one requeues without
+        # consulting the attempt count. Using requeue_always here would let a
+        # Restart=always crash loop pick the same job up forever, since /deregister
+        # is never called and the count never grows
         def reap_previous_processes
           WorkerProcess.where(worker_id: current_worker.worker_id, stopped_at: nil)
             .where.not(instance_id: params[:instance_id]).find_each do |process|

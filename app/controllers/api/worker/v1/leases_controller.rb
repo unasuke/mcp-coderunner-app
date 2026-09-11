@@ -2,8 +2,8 @@ module Api
   module Worker
     module V1
       class LeasesController < BaseController
-        # ロングポーリング。最大 LEASE_WAIT 秒待って、ジョブが無ければ 204。
-        # enqueue から実行開始までの遅延はそのままチャットの体感になる。
+        # Long polling. Waits up to LEASE_WAIT seconds, and answers 204 with no job.
+        # The delay between enqueue and start is felt directly in the chat.
         def create
           unless protocol_matches?
             return render json: {
@@ -23,11 +23,11 @@ module Api
 
         private
 
-        # 通知の仕組みには乗せない。SQLite に LISTEN/NOTIFY 相当が無く、
-        # Solid Queue の経路に載せても結局どこかでポーリングになる。
+        # Nothing here rides on a notification mechanism. SQLite has no LISTEN/NOTIFY,
+        # and routing it through Solid Queue ends in polling somewhere anyway.
         #
-        # beat! はリクエストにつき 1 回でよい。ロングポーリングを掴んでいること
-        # 自体が生存の証拠であり、失効の閾値（2 分）に対して窓は 25 秒しかない。
+        # One beat! per request is enough: holding the long poll open is itself proof
+        # of life, and the window is 25 seconds against a two-minute expiry.
         def wait_for_job(process)
           deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + Protocol::Constants::LEASE_WAIT
           process.beat!
@@ -41,7 +41,7 @@ module Api
           end
         end
 
-        # limits は要求値であり、ワーカーはこれを上限としてのみ解釈する
+        # limits is what was asked for, and the worker reads it as a ceiling and nothing else
         def payload_for(claimed)
           job = claimed.job
 

@@ -1,5 +1,6 @@
-# 起動ごとの実体。短命。
-# 生死の判定は last_heartbeat_at の古さだけで行い、行の存在を生存の証拠にしない。
+# One run of the process. Short-lived.
+# Whether it is alive is decided by the age of last_heartbeat_at alone; the row
+# existing is never taken as evidence of life.
 class WorkerProcess < ApplicationRecord
   scope :alive, ->(now = Time.current) {
     where(stopped_at: nil).where(last_heartbeat_at: (now - Protocol::Constants::HEARTBEAT_EXPIRY)..)
@@ -15,7 +16,7 @@ class WorkerProcess < ApplicationRecord
     Lease.active.held_by(instance_id)
   end
 
-  # busy はワーカーに申告させない。保持している未解放のリースの本数を数える
+  # The worker does not get to declare it is busy. Count the leases it holds unreleased
   def busy
     leases.count
   end

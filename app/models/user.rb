@@ -1,5 +1,6 @@
 class User < ApplicationRecord
-  # 文字列で持つ。DB を直接覗いたときに意味が読め、値の並び替えで壊れない
+  # Stored as strings: it reads as something when looking straight at the database,
+  # and reordering the values breaks nothing
   enum :role, { pending: "pending", member: "member", admin: "admin" }, default: "pending"
 
   has_many :sessions, dependent: :destroy
@@ -8,7 +9,7 @@ class User < ApplicationRecord
   validates :github_uid, presence: true, uniqueness: true
   validates :login, presence: true
 
-  # pending のユーザーができることは何もない。MCP に到達できるのは member 以上
+  # A pending user can do nothing at all. MCP is reachable from member and above
   def can_use_mcp?
     member? || admin?
   end
@@ -17,8 +18,8 @@ class User < ApplicationRecord
     update!(role:, approved_by: by, approved_at: Time.current)
     return if can_use_mcp?
 
-    # 使えなくしたなら、ブラウザのセッションだけでなく MCP のトークンも切る。
-    # 昇格のときは触らない
+    # Taking access away cuts the MCP tokens, not only the browser sessions.
+    # A promotion touches neither
     sessions.destroy_all
     revoke_oauth_access!
   end

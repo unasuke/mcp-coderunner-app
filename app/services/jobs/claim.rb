@@ -1,6 +1,6 @@
 module Jobs
-  # queued のジョブを 1 件掴んで leases の行を作り、state を leased にするところまでを
-  # 1 トランザクションで行う。SQLite は書き込みが直列なので、追加のロックは要らない。
+  # Takes one queued job, writes the leases row, and moves the state to leased,
+  # all in one transaction. SQLite serializes writes, so no further lock is needed.
   class Claim
     Claimed = Data.define(:job, :lease, :token)
 
@@ -15,12 +15,13 @@ module Jobs
       end
     end
 
-    # bench は排他。サーバーとワーカーの両方で持つ（VPS の状態がずれても 2 本同時に走らせない）。
+    # bench is exclusive, and both sides hold that (so a drifted VPS still cannot
+    # get two running at once).
     #
-    #   - bench が走っているあいだは何も渡さない
-    #   - ほかのジョブが走っているあいだは bench を渡さない
+    #   - while a bench job runs, hand out nothing
+    #   - while any other job runs, hand out no bench
     #
-    # 測定値が壊れても結果を見ただけでは分からないので、ここは厳しく直列にする。
+    # A ruined measurement looks like a fine result, so this is kept strictly serial.
     def self.next_claimable
       return nil if exclusive_running?
 

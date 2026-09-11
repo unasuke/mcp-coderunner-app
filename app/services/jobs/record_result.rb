@@ -1,12 +1,12 @@
 module Jobs
-  # 結果はジョブに 1 行だけ。lease が失効していたら 409 で拒否する。
-  # 二重実行が起きても、DB に入るのは生き残った側の結果だけになる。
+  # One result row per job, and an expired lease is turned away with a 409.
+  # Even if a job did run twice, only the surviving side's result is stored.
   class RecordResult
     Conflict = Class.new(StandardError)
 
     def self.call(job:, lease_token:, attributes:)
-      # 認証もトランザクションの中でやり直す。確認したあとに別の経路で
-      # 解放されていると、失効したリースの結果を受け入れてしまう
+      # Authenticate inside the transaction as well. Released by another path
+      # after the check, and the result of a dead lease would be accepted
       Job.transaction do
         lease = job.leases.active.first
         raise Conflict, "lease is not active" unless lease&.authenticate(lease_token)
@@ -16,7 +16,7 @@ module Jobs
         job.job_result
       end
     rescue ActiveRecord::RecordNotUnique
-      # 結果はジョブに 1 行だけ。二重送信は 409 であって 500 ではない
+      # One result row per job. A double send is a 409, not a 500
       raise Conflict, "a result is already recorded"
     end
 

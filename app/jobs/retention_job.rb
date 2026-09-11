@@ -1,5 +1,5 @@
-# ジョブのペイロードと結果は VPS 上に平文で溜まる。秘匿情報は構造的に入らないが、
-# ディスクは埋まる。日次で回す。
+# Job payloads and results accumulate on the VPS in the clear. Nothing secret can
+# structurally end up in them, but the disk still fills. Runs daily.
 class RetentionJob < ApplicationJob
   queue_as :default
 
@@ -15,8 +15,8 @@ class RetentionJob < ApplicationJob
 
   private
 
-  # アクセストークンは 15 分で切れるが、リフレッシュには寿命が無い。
-  # ローテーションのたびに行が作り直されるので、created_at が最後に使われた時刻になる
+  # An access token expires in 15 minutes, but a refresh token has no lifetime of
+  # its own. Every rotation writes a new row, so created_at is when it was last used
   def revoke_stale_refresh_tokens(now, retention)
     Doorkeeper::AccessToken
       .where(revoked_at: nil)
@@ -25,9 +25,10 @@ class RetentionJob < ApplicationJob
       .find_each(&:revoke)
   end
 
-  # ディスクを食っているのは stdout と stderr（各 256KB まで）で、行そのものは小さい。
-  # 行ごと消すと termination_reason まで失われ、get_job が「まだ結果が無い」と
-  # 見分けがつかなくなる。本文だけ空にして、消したことは purged_at で表す
+  # What eats the disk is stdout and stderr (up to 256KB each); the row itself is
+  # small. Deleting the row would take termination_reason with it, leaving get_job
+  # unable to tell this apart from "no result yet". Empty the body instead, and say
+  # so through purged_at
   def purge_outputs(now, retention)
     JobResult.where(created_at: ...(now - retention)).find_each do |result|
       next if result.stdout.blank? && result.stderr.blank?
@@ -37,8 +38,8 @@ class RetentionJob < ApplicationJob
     end
   end
 
-  # script は not null のままにする。消したことは purged_at で表す。
-  # 「消した」と「元々空だった」を取り違えないため
+  # script stays not null, and purged_at is what says it was cleared -- so that
+  # "deleted" and "empty to begin with" are not mistaken for each other
   def purge_scripts(now, retention)
     Job.finished.where.not(script: "").where(created_at: ...(now - retention)).find_each do |job|
       job.update_columns(script: "", purged_at: job.purged_at || now)

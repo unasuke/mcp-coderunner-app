@@ -6,14 +6,16 @@
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
 
-    <%# 同じ URL への再訪問（ジョブの自動更新）は差分適用にして、スクロール位置を保つ %>
+    <%# Revisiting the same URL -- a job page refreshing itself -- is applied as a diff,
+        which is what keeps the scroll position %>
     <meta name="turbo-refresh-method" content="morph">
     <meta name="turbo-refresh-scroll" content="preserve">
 
     <%= yield :head %>
 
-    <%# 対応しているブラウザは SVG を使う。絵文字そのものなので、どの大きさでも崩れず
-        タブの地色にも左右されない。PNG は非対応の環境とホーム画面向け %>
+    <%# Browsers that can take the SVG use it. It is the emoji itself, so it holds up at
+        any size and does not care what color the tab is. The PNG is for everything else,
+        and for the home screen %>
     <link rel="icon" href="/icon.png" type="image/png" sizes="512x512">
     <link rel="icon" href="/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icon.png">

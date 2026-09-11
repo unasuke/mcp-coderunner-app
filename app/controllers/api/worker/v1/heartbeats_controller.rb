@@ -2,8 +2,8 @@ module Api
   module Worker
     module V1
       class HeartbeatsController < BaseController
-        # 30 秒ごと。ジョブの有無にかかわらず打つ。
-        # busy はワーカーに申告させない。サーバーが未解放の leases を数える
+        # Every 30 seconds, job or no job.
+        # The worker does not get to declare it is busy; the server counts unreleased leases
         def create
           process = find_process
           return render(json: { error: "unknown instance" }, status: :not_found) unless process
@@ -13,7 +13,7 @@ module Api
           render json: {
             server_commit: server_commit,
             outdated: outdated?,
-            # プロトコル不一致のときは新規の lease を止めさせる
+            # On a protocol mismatch, tell it to stop taking new leases
             drain: !protocol_matches?
           }
         end

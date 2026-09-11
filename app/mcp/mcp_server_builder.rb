@@ -1,8 +1,9 @@
-# MCP::Server（gem 側）を組み立てる。Rails のオートロードでは app/mcp がルートになるので、
-# 名前空間ではなく単独の定数として持つ。
+# Assembles the gem's MCP::Server. Rails autoloading treats app/mcp as a root, so
+# this is a constant of its own rather than a namespace.
 #
-# トランスポートを SDK に寄せておくと、protocol version のネゴシエーションやセッションの
-# 扱いといった、仕様追従が必要で自分では検証しにくい部分を持たずに済む。
+# Leaving the transport to the SDK means not owning the parts that have to follow
+# the specification and are hard to verify here -- protocol version negotiation,
+# session handling, and the like.
 module McpServerBuilder
   NAME = "mcp-coderunner-app"
   VERSION = "0.1.0"

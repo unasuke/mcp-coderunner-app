@@ -2,11 +2,11 @@ class Job < ApplicationRecord
   NotApprovable = Class.new(StandardError)
 
   STATES = %w[ pending_review rejected queued leased running finished ].freeze
-  # 検証用のスクリプトは普通は数 KB に収まる。これを超えている時点で何か変なことが起きている
+  # A script written to try something out usually fits in a few KB. Past this, something else is going on
   def self.review_script_bytes = Rails.configuration.x.mcp_coderunner_app.script_review_bytes
   def self.max_script_bytes = Rails.configuration.x.mcp_coderunner_app.script_max_bytes
 
-  # 既定値は pending_review。state の設定を書き忘れたジョブは実行されずに止まる
+  # The default is pending_review, so a job whose state nobody set stops rather than runs
   enum :state, STATES.index_by(&:itself), default: "pending_review"
 
   belongs_to :blueprint
@@ -22,7 +22,7 @@ class Job < ApplicationRecord
 
   scope :claimable, -> { queued.order(:created_at) }
 
-  # 試行回数のカラムは持たない。leases の本数がそのまま試行回数になる
+  # No attempt counter column. The number of leases is the number of attempts
   def attempts
     leases.count
   end
@@ -47,9 +47,10 @@ class Job < ApplicationRecord
     purged_at.present?
   end
 
-  # pending_review には承認と却下だけを置き、queued 以降にはキャンセルだけを置く。
-  # Blueprint が承認されるまでは承認できない。Dockerfile を読まずに実行へ進む
-  # 経路を作らないため（digest を指定すれば未承認の Blueprint でもジョブは作れる）
+  # pending_review offers approve and reject, and nothing past queued offers
+  # anything but cancel. A job cannot be approved before its Blueprint is, so that
+  # no path leads to execution without someone having read the Dockerfile (naming
+  # a digest is enough to create a job against an unapproved Blueprint)
   def approvable?
     pending_review? && blueprint.approved?
   end

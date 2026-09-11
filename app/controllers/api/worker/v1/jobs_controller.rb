@@ -5,8 +5,9 @@ module Api
         before_action :set_job
         before_action :authenticate_lease!
 
-        # 30 秒ごと。build 中も打つ。受けるたびに lease_expires_at を延ばす。
-        # 「生きている限り延びる」形なら、ビルドが何分かかるかを事前に見積もる必要がない
+        # Every 30 seconds, during a build as well. Each one pushes lease_expires_at
+        # further out. With the lease living as long as the worker does, nobody has to
+        # guess up front how many minutes a build will take
         def heartbeat
           @lease.extend!
           @job.running! if @job.leased?
@@ -17,7 +18,7 @@ module Api
           }
         end
 
-        # 結果はジョブに 1 行だけ。lease が失効していたら 409 で拒否する
+        # One result row per job, and an expired lease is turned away with a 409
         def result
           Jobs::RecordResult.call(job: @job, lease_token: params[:lease_token], attributes: result_attributes)
 

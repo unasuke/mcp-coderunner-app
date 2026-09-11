@@ -1,10 +1,10 @@
 import { Controller } from "@hotwired/stimulus"
 
-// 実行中のジョブを追いかける。
+// Follows a job while it runs.
 //
-// meta http-equiv="refresh" は使えない。パースした時点でブラウザ側にタイマーが
-// 仕掛かり、Turbo で別のページに移っても消えないので、あとから元の URL に
-// 引き戻される。Stimulus なら要素が DOM から外れた時点で disconnect が呼ばれる。
+// meta http-equiv="refresh" cannot do this. Parsing it arms a timer in the browser
+// that survives a Turbo visit to another page, and pulls the reader back to the old
+// URL later on. With Stimulus, disconnect fires the moment the element leaves the DOM.
 export default class extends Controller {
   static values = { interval: { type: Number, default: 5000 } }
 
@@ -17,7 +17,7 @@ export default class extends Controller {
   }
 
   reload() {
-    // 見ていないタブを更新しても意味がない
+    // Refreshing a tab nobody is looking at is pointless
     if (document.hidden) return
 
     Turbo.visit(window.location.href, { action: "replace" })

@@ -1,6 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 
-// 一度しか表示されない値（ワーカーのトークン）を取りこぼさないための口。
+// So a value shown exactly once -- a worker's token -- does not get lost.
 export default class extends Controller {
   static targets = ["source"]
 

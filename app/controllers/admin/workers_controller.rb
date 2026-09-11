@@ -6,17 +6,18 @@ module Admin
       @server_commit = Rails.configuration.x.mcp_coderunner_app.commit_hash
     end
 
-    # 平文はその場で 1 度だけ表示する。DB に入るのは SHA256 だけなので、閉じたら二度と見られない
+    # The plaintext is shown once, right there. Only the SHA256 is stored, so once
+    # the page is closed it is gone for good
     def create
       worker, token = Worker.issue!(worker_id: params.fetch(:worker_id))
-      # 平文は表示用の flash にだけ載せる。保存されるのはハッシュだけ
+      # The plaintext rides in the flash and nowhere else. What is stored is the hash
       flash[:issued_token] = token
       redirect_to admin_workers_path, notice: "#{worker.worker_id} のトークンを発行しました"
     rescue ActiveRecord::RecordInvalid => e
       redirect_to admin_workers_path, alert: e.record.errors.full_messages.join(", ")
     end
 
-    # 行は消さない。worker_processes と過去の leases から参照される
+    # The row stays. worker_processes and past leases refer to it
     def revoke
       worker = Worker.find(params[:id])
       worker.revoke!

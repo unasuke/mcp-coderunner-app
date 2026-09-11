@@ -1,6 +1,6 @@
-# ツールのエラーは JSON-RPC のエラーではなく、isError を立てた結果として本文で返す。
-# プロトコルレベルのエラーにすると、クライアントによっては内容がモデルに届かず、
-# 何が悪かったか分からないまま同じ呼び出しを繰り返すことになる。
+# A tool's error comes back in the body with isError set, rather than as a JSON-RPC
+# error. Raised at the protocol level, some clients never pass the content to the
+# model, which then repeats the same call with no idea what was wrong.
 class McpToolError < StandardError
   CODES = %w[
     blueprint_not_found

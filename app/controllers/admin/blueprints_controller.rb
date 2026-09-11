@@ -24,7 +24,7 @@ module Admin
       redirect_to admin_blueprint_path(@blueprint), notice: "却下しました"
     end
 
-    # revoked が止めるのは新規投入だけ。既に queued に入っているジョブは走る
+    # Revoking stops new submissions only. A job already queued still runs
     def revoke
       return redirect_to(admin_blueprint_path(@blueprint), alert: refusal) unless @blueprint.revocable?
 
@@ -34,7 +34,7 @@ module Admin
 
     private
 
-    # 一度断ったものや失効させたものを、POST だけで承認に戻せないようにする
+    # Something already turned down or revoked cannot be walked back to approved by a POST
     def refusal
       "この実行環境は #{@blueprint.state} です。新しく提案されたものをレビューしてください"
     end

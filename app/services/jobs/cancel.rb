@@ -1,8 +1,10 @@
 module Jobs
-  # キャンセルは queued 以降のすべての状態で押せる（pending_review は却下で終わらせる）。
+  # Cancel is available in every state from queued onward (pending_review ends by
+  # being rejected instead).
   #
-  # leased 以降で即座に止められないのは、ワーカーへ命令を送る経路が heartbeat しか
-  # ないため。自宅側に inbound の口を開けない以上ここは動かせない。
+  # From leased on it cannot stop anything immediately, because the heartbeat is
+  # the only channel that reaches the worker. As long as nothing listens on the
+  # home side, that does not change.
   class Cancel
     def self.call(job:)
       return false unless job.cancellable?
@@ -17,7 +19,7 @@ module Jobs
           )
         end
       else
-        # 次の job heartbeat（最長 HEARTBEAT_INTERVAL 秒）でワーカーに伝わる
+        # Reaches the worker on the next job heartbeat, within HEARTBEAT_INTERVAL seconds
         job.update!(cancel_requested_at: Time.current)
       end
 

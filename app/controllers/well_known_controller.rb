@@ -1,5 +1,5 @@
-# MCP のクライアントが 401 の WWW-Authenticate から辿ってくるメタデータ。
-# Caddy 側でも公開のままにしてある（RFC 9728 / RFC 8414）。
+# The metadata an MCP client follows from the WWW-Authenticate of a 401.
+# Caddy leaves these public as well (RFC 9728 / RFC 8414).
 class WellKnownController < ActionController::API
   # RFC 9728
   def protected_resource

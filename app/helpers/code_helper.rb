@@ -1,7 +1,7 @@
 require "rouge"
 
-# Dockerfile とスクリプトの表示。レビューは行単位で読むので、
-# 強調も差分も行の単位に揃える。
+# Rendering Dockerfiles and scripts. Review reads line by line, so both the
+# highlighting and the diff are lined up to match.
 module CodeHelper
   LEXERS = {
     dockerfile: Rouge::Lexers::Docker,
@@ -9,8 +9,8 @@ module CodeHelper
     plain: Rouge::Lexers::PlainText
   }.freeze
 
-  # 複数行にまたがるトークン（ヒアドキュメント、ブロックコメント）があるので、
-  # 出力を改行で割るのではなくトークン列のほうを割る
+  # Some tokens span lines (heredocs, block comments), so it is the token stream
+  # that gets split on newlines, not the rendered output
   def highlight_lines(text, syntax: :plain)
     formatter = Rouge::Formatters::HTML.new
     lexer = LEXERS.fetch(syntax, LEXERS[:plain]).new
@@ -23,13 +23,13 @@ module CodeHelper
       end
     end
 
-    # 末尾の改行そのものを 1 行として数えない
+    # A trailing newline is not itself a line
     lines.pop if lines.size > 1 && lines.last.empty?
     lines.map { |tokens| formatter.format(tokens).html_safe }
   end
 
-  # 前の版との行差分。Dockerfile は小さいので素朴な LCS で足りる。
-  # 返すのは [:same | :add | :del, 強調済みの行] の並び。
+  # A line diff against the previous revision. Dockerfiles are small, so a plain
+  # LCS is enough. It returns a sequence of [:same | :add | :del, highlighted line].
   def line_diff(before, after, syntax: :plain)
     old_raw = split_lines(before)
     new_raw = split_lines(after)
@@ -46,7 +46,7 @@ module CodeHelper
 
   private
 
-  # 末尾の改行そのものを 1 行として数えない（highlight_lines と揃える）
+  # A trailing newline is not itself a line (kept in step with highlight_lines)
   def split_lines(text)
     lines = text.to_s.split("\n", -1)
     lines.pop if lines.size > 1 && lines.last.empty?

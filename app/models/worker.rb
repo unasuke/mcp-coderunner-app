@@ -1,5 +1,5 @@
-# ワーカーの資格情報。長命で、再起動をまたいで残る。
-# 起動ごとの実体は WorkerProcess が持つ。
+# A worker's credential. Long-lived, and outlasts restarts.
+# WorkerProcess holds the individual run.
 class Worker < ApplicationRecord
   TOKEN_BYTES = 32
 
@@ -10,15 +10,16 @@ class Worker < ApplicationRecord
 
   scope :active, -> { where(revoked_at: nil) }
 
-  # 平文はその場で 1 度だけ表示する。DB に入るのは SHA256 だけなので、閉じたら二度と見られない。
-  # 無くしたら再発行する。行は増やさず、同じ worker_id のダイジェストを差し替える
-  # （過去の worker_processes と leases がこの行を指しているため）
+  # The plaintext is shown once, right there. Only the SHA256 is stored, so once
+  # the page is closed it is gone for good; losing it means issuing a new one.
+  # That does not add a row -- it replaces the digest on the same worker_id,
+  # because past worker_processes and leases point at this row
   def self.issue!(worker_id:)
     token = SecureRandom.urlsafe_base64(TOKEN_BYTES)
     worker = find_or_initialize_by(worker_id:)
     worker.token_digest = digest(token)
-    # 失効させた worker_id に再発行したら、新しいトークンで使えるようにする。
-    # 古いトークンはダイジェストが変わった時点で通らない
+    # Re-issuing against a revoked worker_id puts it back in service under the new
+    # token. The old one stops working the moment the digest changes
     worker.revoked_at = nil
     worker.save!
 
@@ -35,7 +36,7 @@ class Worker < ApplicationRecord
     Digest::SHA256.hexdigest(token)
   end
 
-  # 行は消さない。worker_processes と過去の leases から参照される
+  # The row stays. worker_processes and past leases refer to it
   def revoke!
     update!(revoked_at: Time.current)
   end

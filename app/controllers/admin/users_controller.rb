@@ -4,7 +4,8 @@ module Admin
       @users = User.order(:created_at)
     end
 
-    # pending の承認と member / admin の昇格。実質 1 人だが、これが無いと 2 人目を通せない
+    # Approving a pending user, and promoting to member or admin. There is one user
+    # in practice, but without this there is no way to let a second one in
     def update
       user = User.find(params[:id])
       role = params.fetch(:role)
