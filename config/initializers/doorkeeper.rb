@@ -193,6 +193,9 @@ Doorkeeper.configure do
   # DCR で発行するのは public クライアント。client_secret を持てるかどうかに依存させない
   force_pkce
 
+  # plain は検証になっていない。S256 だけ受け付ける
+  pkce_code_challenge_methods %w[ S256 ]
+
   # Hash access and refresh tokens before persisting them.
   # This will disable the possibility to use +reuse_access_token+
   # since plain values can no longer be retrieved.
@@ -200,7 +203,9 @@ Doorkeeper.configure do
   # Note: If you are already a user of doorkeeper and have existing tokens
   # in your installation, they will be invalid without adding 'fallback: :plain'.
   #
-  # hash_token_secrets
+  # DB に平文のトークンを置かない。セッション・ワーカー・lease と揃える。
+  # まだ本番で常用していないので、既存の平文行は捨ててハッシュのみにする
+  hash_token_secrets
   # By default, token secrets will be hashed using the
   # +Doorkeeper::Hashing::SHA256+ strategy.
   #

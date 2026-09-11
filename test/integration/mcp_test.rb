@@ -12,7 +12,7 @@ class McpTest < ActionDispatch::IntegrationTest
     )
   end
 
-  def rpc(method, params = {}, id: 1, token: @token.token)
+  def rpc(method, params = {}, id: 1, token: @token.plaintext_token)
     post "/mcp", headers: { "Authorization" => "Bearer #{token}" }, as: :json,
       params: { jsonrpc: "2.0", id:, method:, params: }
     response.parsed_body
@@ -287,12 +287,12 @@ class McpTest < ActionDispatch::IntegrationTest
 
   # SSE のストリームは提供しないので 405（仕様上の MUST）
   test "GET and DELETE on the endpoint are refused with 405" do
-    get "/mcp", headers: { "Authorization" => "Bearer #{@token.token}" }
+    get "/mcp", headers: { "Authorization" => "Bearer #{@token.plaintext_token}" }
 
     assert_response :method_not_allowed
     assert_equal "POST", response.headers["Allow"]
 
-    delete "/mcp", headers: { "Authorization" => "Bearer #{@token.token}" }
+    delete "/mcp", headers: { "Authorization" => "Bearer #{@token.plaintext_token}" }
 
     assert_response :method_not_allowed
   end

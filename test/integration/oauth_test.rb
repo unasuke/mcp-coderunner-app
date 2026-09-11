@@ -93,6 +93,27 @@ class OauthTest < ActionDispatch::IntegrationTest
     assert_equal 4, response.parsed_body.dig("result", "tools").size
   end
 
+  # 列が無くて PKCE が黙って無視されていた穴がある。happy path だけでは再発する
+  test "an authorization without a code_challenge is refused" do
+    sign_in(role: :member)
+
+    get "/oauth/authorize", params: authorize_params.except(:code_challenge, :code_challenge_method)
+
+    assert_response :bad_request
+    assert_match(/Code challenge is required/, response.body)
+  end
+
+  # plain は検証になっていない
+  test "the plain challenge method is refused" do
+    sign_in(role: :member)
+
+    get "/oauth/authorize", params: authorize_params.merge(
+      code_challenge: @verifier, code_challenge_method: "plain"
+    )
+
+    assert_response :bad_request
+  end
+
   # PKCE を必須にしてあるので、verifier が違えば交換できない
   test "a wrong code_verifier is refused" do
     sign_in(role: :member)
