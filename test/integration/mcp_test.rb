@@ -69,6 +69,19 @@ class McpTest < ActionDispatch::IntegrationTest
     assert_equal "ruby-3.4", again["name"]
   end
 
+  # /admin が前の版との差分でレビューできるように、同じ名前の直前の版に繋ぐ
+  test "a second proposal under the same name links to the previous one" do
+    first, = tool("propose_blueprint", {
+      name: "ruby-3.4", summary: "最初の版", dockerfile: "FROM ruby:3.4-slim\n"
+    })
+    second, = tool("propose_blueprint", {
+      name: "ruby-3.4", summary: "依存を足した版", dockerfile: "FROM ruby:3.4-slim\nRUN bundle install\n"
+    })
+
+    assert second["created"]
+    assert_equal first["blueprint_id"], Blueprint.find(second["blueprint_id"]).parent_id
+  end
+
   test "list_blueprints only returns approved ones" do
     Blueprint.create!(name: "waiting", summary: "x", dockerfile: "FROM a\n",
       digest: Blueprint.digest_for(dockerfile: "FROM a\n", files: []))

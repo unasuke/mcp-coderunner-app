@@ -42,6 +42,8 @@ module Blueprints
 
     def create!(digest)
       Blueprint.create!(
+        # 同じ名前の直前の版に繋ぐ。/admin が差分でレビューできるようにする
+        parent: Blueprint.where(name: @name).order(created_at: :desc).first,
         name: @name,
         summary: @summary,
         dockerfile: @dockerfile,

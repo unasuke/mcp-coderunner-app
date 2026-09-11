@@ -1,4 +1,6 @@
 class Blueprint < ApplicationRecord
+  InvalidTransition = Class.new(StandardError)
+
   # draft は持たない。Blueprint が生まれる経路は propose_blueprint だけで、
   # 提案された時点でレビュー待ちになる
   STATES = %w[ pending_review approved rejected revoked ].freeze
@@ -43,16 +45,31 @@ class Blueprint < ApplicationRecord
     )
   end
 
+  # 遷移はサーバー側で閉じる。revoked に POST しても approved には戻らない
+  def reviewable?
+    pending_review?
+  end
+
+  def revocable?
+    approved?
+  end
+
   def approve!(by:)
+    raise InvalidTransition, "blueprint is #{state}" unless reviewable?
+
     update!(state: :approved, reviewed_by: by, reviewed_at: Time.current)
   end
 
   def reject!(by:, note: nil)
+    raise InvalidTransition, "blueprint is #{state}" unless reviewable?
+
     update!(state: :rejected, reviewed_by: by, reviewed_at: Time.current, review_note: note)
   end
 
   # revoked が止めるのは新規投入だけ。既に queued に入っているジョブは走る
   def revoke!(by:, note: nil)
+    raise InvalidTransition, "blueprint is #{state}" unless revocable?
+
     update!(state: :revoked, reviewed_by: by, reviewed_at: Time.current, review_note: note)
   end
 
