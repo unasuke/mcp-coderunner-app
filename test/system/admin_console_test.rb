@@ -98,6 +98,12 @@ class AdminConsoleTest < ApplicationSystemTestCase
 
   def sign_in
     visit login_path
+    # Wait for the page to be there before reaching into it. Reaching for a node
+    # while the document is still being replaced fails as a Selenium UnknownError
+    # ("Node with given id does not belong to the document"), which Capybara does
+    # not know to retry the way it retries a stale node
+    assert_selector ".gate h1", text: "mcp-coderunner-app"
+
     click_on "GitHub でログイン"
 
     assert_text "unasuke（admin）"
