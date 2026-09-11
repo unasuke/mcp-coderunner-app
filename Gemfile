@@ -54,7 +54,7 @@ gem "kamal", require: false
 gem "thruster", require: false
 
 # Use Active Storage variants [https://guides.rubyonrails.org/active_storage_overview.html#transforming-images]
-gem "image_processing", "~> 1.2"
+gem "image_processing", "~> 2.1"
 # image_processing 2.0 made its backends soft dependencies: whichever one you
 # want has to be named here, or it installs with no way to process anything.
 # vips, because libvips is what the image carries -- ImageMagick is not there,
