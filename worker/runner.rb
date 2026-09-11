@@ -78,7 +78,7 @@ module Worker
           applied_limits: applied
         )
       ensure
-        Docker.run("rm", "--force", container)
+        Docker.run("rm", "--force", "--volumes", container)
         FileUtils.remove_entry(job_dir(payload), true)
       end
     end
