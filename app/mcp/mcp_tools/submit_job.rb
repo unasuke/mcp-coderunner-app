@@ -3,13 +3,19 @@ module McpTools
     tool_name "submit_job"
     description <<~TEXT
       承認済みの Blueprint 上でスクリプトを実行する。すぐには返らず、job_id を返す。
-      結果は get_job で取りに行く。実行コンテナはネットワークに出られない。
+      結果は get_job で取りに行く。
+
+      コンテナは隔離されている。ネットワークには出られない（DNS も引けない）。
+      ファイルシステムは読み取り専用で、**書き込めるのは /tmp だけ**（tmpfs）。
+      カレントディレクトリ（/work）に書き出す処理は EROFS で失敗するので、
+      出力先は /tmp にすること。
     TEXT
 
     input_schema(
       properties: {
         blueprint: { type: "string", description: "digest（64 桁の hex）か name。name なら同名で最新の承認済みを使う" },
-        script: { type: "string", description: "コンテナ内の /work/script.rb に置かれる本体" },
+        script: { type: "string",
+                  description: "コンテナ内の /work/script.rb に置かれる本体。/work は読み取り専用で、書き込みは /tmp へ" },
         profile: {
           type: "string",
           enum: Protocol::ResourceProfile::NAMES,

@@ -1,7 +1,13 @@
 module McpTools
   class GetJob < Base
     tool_name "get_job"
-    description "ジョブの状態と結果。applied_limits を必ず含むので、ベンチマークの数値は制限下のものだと分かる。"
+    description <<~TEXT
+      ジョブの状態と結果。applied_limits を必ず含むので、ベンチマークの数値は制限下のものだと分かる。
+
+      duration_ms は投入から完了までの実時間で、初回はイメージのビルドを含む。
+      同じ Blueprint の 2 回目以降はビルドが省かれるので短くなる。
+      コンテナ自身の消費を見るなら cpu_time_ms と max_rss_bytes（cgroup から採取）を使う。
+    TEXT
 
     input_schema(
       properties: { job_id: { type: "integer" } },

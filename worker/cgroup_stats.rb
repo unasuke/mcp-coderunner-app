@@ -10,7 +10,16 @@ module Worker
   # each returns nil and the job still succeeds. Failing to measure a run is not
   # the same as the run failing.
   class CgroupStats
-    INTERVAL = 1.0
+    # The cgroup goes away the moment the container exits, so the last reading
+    # taken while it was alive is the one that gets reported -- there is no final
+    # read. At one second, a job that allocates and exits reported 30MB of a real
+    # 200MB peak, because the only reading that landed was taken before the script
+    # had grown. A tenth of a second reported 197MB. Ten reads a second of four
+    # small files costs nothing next to getting the number wrong.
+    #
+    # A job that exits inside the first interval still reports what was true at
+    # startup. Nothing can be done about that from here.
+    INTERVAL = 0.1
     CGROUP_ROOT = "/sys/fs/cgroup"
 
     attr_reader :cpu_time_ms, :max_rss_bytes, :oom_kills, :pids_max_events
