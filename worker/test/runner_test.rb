@@ -112,6 +112,29 @@ class RunnerTest < Minitest::Test
     assert_includes result.stderr, "TypeError: boom"
   end
 
+  # ローカルに無いタグは失敗させる。Hub から同名のイメージを引かせない
+  def test_never_pulls
+    assert_equal "never", pair(args, "--pull")
+  end
+
+  # digest は承認の単位。中身から計算し直して一致しなければ実行しない
+  def test_rejects_a_digest_that_does_not_match_the_context
+    payload = build_payload(digest: "b" * 64)
+
+    result = @runner.call(payload)
+
+    assert_equal "policy_rejected", result.termination_reason
+    assert_includes result.stderr, "digest does not match"
+  end
+
+  def test_rejects_a_digest_that_is_not_hex
+    payload = build_payload(digest: "sha256:deadbeef")
+
+    result = @runner.call(payload)
+
+    assert_equal "policy_rejected", result.termination_reason
+  end
+
   # VPS から来た識別子をそのままパスとコンテナ名に使うので、形を確かめてから使う
   def test_rejects_identifiers_that_are_not_numeric
     payload = build_payload

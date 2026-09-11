@@ -2,6 +2,7 @@
 
 require "fileutils"
 require "json"
+require "protocol/blueprint_digest"
 require "protocol/constants"
 require "protocol/job_result"
 require "protocol/resource_profile"
@@ -29,6 +30,7 @@ module Worker
       applied = @policy.clamp(payload.limits)
 
       validate_identifiers!(payload)
+      validate_digest!(payload)
       @policy.validate_context!(payload.blueprint.dockerfile, payload.blueprint.files)
       tag = @builder.ensure_image!(
         digest: payload.blueprint.digest,
@@ -106,6 +108,8 @@ module Worker
         "--cap-drop", "ALL",
         "--security-opt", "no-new-privileges",
         "--ulimit", "core=0",
+        # ローカルに無いタグは失敗させる。Hub から同名のイメージを引かない
+        "--pull", "never",
         "--volume", "#{workdir}:/work:ro"
       ]
 
@@ -138,10 +142,29 @@ module Worker
       [ payload.job_id, payload.lease_id ].each do |id|
         raise PolicyRejected, "invalid identifier: #{id.inspect}" unless id.to_s.match?(/\A[0-9]+\z/)
       end
+
+      unless payload.blueprint.digest.to_s.match?(/\A[0-9a-f]{64}\z/)
+        raise PolicyRejected, "invalid digest: #{payload.blueprint.digest.inspect}"
+      end
     end
 
+    # digest は承認の単位そのものなので、受け取った中身から計算し直して一致を見る。
+    # 一致しなければ、承認済みの別イメージのタグを名乗られている
+    def validate_digest!(payload)
+      recomputed = Protocol::BlueprintDigest.compute(
+        dockerfile: payload.blueprint.dockerfile,
+        files: payload.blueprint.files.map { |file|
+          { path: file.path, content: file.content, executable: file.executable }
+        }
+      )
+      return if recomputed == payload.blueprint.digest
+
+      raise PolicyRejected, "digest does not match the context: #{payload.blueprint.digest} != #{recomputed}"
+    end
+
+    # lease ごとに分ける。再 lease したときに前の試行のマウントと衝突しない
     def job_dir(payload)
-      File.join(@policy.runtime_dir, payload.job_id.to_s)
+      File.join(@policy.runtime_dir, "#{payload.job_id}-#{payload.lease_id}")
     end
 
     def container_name(payload)
