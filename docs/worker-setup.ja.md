@@ -104,6 +104,22 @@ printf 'DOCKER_HOST=unix:///run/user/%s/docker.sock\n' "$uid" \
 sudo systemctl disable --now docker.service docker.socket
 ```
 
+### rootful から移行する場合
+
+rootful のワーカーを動かしていた VM では**アカウントが既にあるので、上の `useradd` は
+何もしません**。home も作られたときのままです。user manager は `/etc/passwd` の home を
+見る一方、setup ツールは渡した `HOME` の下に unit を書くので、食い違うと
+`Unit docker.service not found` で止まる。
+
+```sh
+sudo usermod --home /var/lib/mcp-coderunner-app mcp-coderunner-app   # -m は付けない。ツールが既にそこへ書いている
+sudo gpasswd -d mcp-coderunner-app docker                            # unit はもう要求しない
+sudo systemctl restart user@$(id -u mcp-coderunner-app).service      # passwd を読み直させる
+```
+
+rootful の daemon が作ったイメージは rootless からは見えないので、最初のジョブは
+Blueprint の再ビルドから始まる。
+
 ### 制限が本当に効いているか確かめる
 
 **ここは飛ばさない。**他が全部正常に見えたまま制限だけ効いていない状態がありえて、
@@ -228,6 +244,7 @@ sudo /opt/mcp-coderunner-app/deploy/update-worker.sh
 | 401 が続く | トークンが失効していないか（`/admin/workers`）。`/etc/mcp-coderunner-app/token` の中身に改行が混ざっていないか |
 | ビルドが `unknown flag: --tag` で落ちる | docker CLI がプラグインディレクトリを見失っている。Docker 29 では `build` は buildx プラグインが提供する。`ProtectHome=yes` によって `$HOME/.docker` が「無い」ではなく「読めない」になるのが原因で、CLI はこの 2 つを区別する。unit の `DOCKER_CONFIG` で回避しているので、古い unit のままなら置き直す |
 | ジョブの制限が `applied_limits` と一致しない | cpu が委譲されていない。3 章の確認 1 行で分かる。`/etc/systemd/system/user@.service.d/` の drop-in を置いて再起動する |
+| setup ツールが unit を書いた直後に `Unit docker.service not found` | `/etc/passwd` の home と、ツールに渡した `HOME` が違うディレクトリを指している。「rootful から移行する場合」を見る |
 | setup ツールが subuid/subgid が無いと言って止まる | `useradd --system` は割り当てない。`sudo usermod --add-subuids 200000-265535 --add-subgids 200000-265535 mcp-coderunner-app` のあと user 側の docker を再起動する |
 | `Cannot connect to the Docker daemon` | `/etc/mcp-coderunner-app/worker.env` が無いか uid が違う。または user 側の daemon が動いていない: `sudo -u mcp-coderunner-app env XDG_RUNTIME_DIR=/run/user/$(id -u mcp-coderunner-app) systemctl --user status docker` |
 | コンテナが残る | `docker ps -a --filter label=mcp-coderunner-app.job`。unit の起動前・停止後の掃除で回収される |
