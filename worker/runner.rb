@@ -118,11 +118,12 @@ module Worker
         "--volume", "#{workdir}:/work:ro"
       ]
 
-      # bench gets pinned to a cpuset, which is how it stays exclusive of other jobs
-      if Protocol::ResourceProfile.exist?(payload.profile) && Protocol::ResourceProfile.exclusive?(payload.profile)
-        args += [ "--cpuset-cpus", "0-#{applied.fetch(:cpus) - 1}" ]
-      end
-
+      # No --cpuset-cpus for bench. What keeps an exclusive job alone is the
+      # serialization on both sides -- Jobs::Claim hands out nothing beside it, and
+      # JobRegistry waits for the rest to drain. Pinning was only ever about holding
+      # the measurement steady, and a rootless daemon does not get the cpuset
+      # controller delegated: docker takes the flag, warns that it discarded it, and
+      # the warning lands in the stderr of the very job being measured.
       args + [ tag ] + Array(payload.entrypoint)
     end
 

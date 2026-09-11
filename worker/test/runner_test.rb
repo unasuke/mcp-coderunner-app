@@ -85,19 +85,19 @@ class RunnerTest < Minitest::Test
     assert_equal "mcp-coderunner-app/bp:#{payload.blueprint.digest}", list[list.index("ruby") - 1]
   end
 
-  # bench gets pinned to a cpuset, which is how it stays exclusive of other jobs
-  def test_bench_pins_cpus
+  # Exclusive jobs are kept alone by the serialization on both sides, not by pinning.
+  # A rootless daemon is not delegated the cpuset controller, so the flag would be
+  # taken, discarded with a warning, and that warning would land in the stderr of the
+  # job being measured
+  def test_bench_is_not_pinned_to_a_cpuset
     payload = build_payload(profile: "bench",
       limits: { "memory_mb" => 4096, "cpus" => 4, "pids" => 1024, "timeout_s" => 300, "tmpfs_mb" => 1024 })
     policy = build_policy(limits: { "max_cpus" => 4, "max_memory_mb" => 4096, "max_tmpfs_mb" => 1024 })
     list = Worker::Runner.new(policy:).run_args(payload, applied: policy.clamp(payload.limits),
       tag: "mcp-coderunner-app/bp:x", workdir: "/w", container: "c")
 
-    assert_equal "0-3", pair(list, "--cpuset-cpus")
-  end
-
-  def test_default_profile_is_not_pinned
-    refute_includes args, "--cpuset-cpus"
+    refute_includes list, "--cpuset-cpus"
+    assert_equal "4", pair(list, "--cpus")
   end
 
   # Even when a bug in the worker lets an exception out, a result always goes back
