@@ -1,4 +1,4 @@
-# mcp-coderunner-app
+# 📋 mcp-coderunner-app
 
 任意の Dockerfile とスクリプトを受け取り、リソース制限下のコンテナで実行する MCP サーバー。
 Ractor の挙動確認やベンチマークを、手元の環境を汚さずに回すためのもの。

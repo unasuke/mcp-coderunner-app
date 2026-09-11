@@ -12,7 +12,10 @@
 
     <%= yield :head %>
 
-    <link rel="icon" href="/icon.png" type="image/png">
+    <%# 対応しているブラウザは SVG を使う。絵文字そのものなので、どの大きさでも崩れず
+        タブの地色にも左右されない。PNG は非対応の環境とホーム画面向け %>
+    <link rel="icon" href="/icon.png" type="image/png" sizes="512x512">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icon.png">
     <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
     <%= javascript_include_tag "application", "data-turbo-track": "reload", type: "module" %>
@@ -21,7 +24,7 @@
   <body>
     <% if Current.user %>
       <header class="bar">
-        <span class="bar-mark">mcp-coderunner-app</span>
+        <span class="bar-mark"><span class="bar-glyph" aria-hidden="true">📋</span>mcp-coderunner-app</span>
 
         <nav>
           <%= link_to "ジョブ", admin_jobs_path, "aria-current": ("page" if controller_path == "admin/jobs") %>

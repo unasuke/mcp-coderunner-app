@@ -1,7 +1,7 @@
 <% content_for :title, "ログイン" %>
 
 <div class="gate">
-  <h1>mcp-coderunner-app</h1>
+  <h1><span class="gate-glyph" aria-hidden="true">📋</span> mcp-coderunner-app</h1>
   <p>Dockerfile とスクリプトを、隔離したコンテナで実行する仕組みの管理画面です。</p>
 
   <%= button_to "GitHub でログイン", github_auth_path, method: :post, class: "btn-go", data: { turbo: false } %>

@@ -81,12 +81,19 @@ a:hover { text-decoration-thickness: 2px; }
 }
 
 .bar-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.14em;
   color: var(--ink-soft);
   margin-right: var(--step);
 }
+
+/* 絵文字は字面が大きいので、周りの文字に合わせて少し詰める */
+.bar-glyph { font-size: 15px; letter-spacing: 0; }
+.gate-glyph { font-size: 1.1em; }
 
 .bar nav { display: flex; flex-wrap: wrap; gap: calc(var(--step) * 2); flex: 1; }
 
