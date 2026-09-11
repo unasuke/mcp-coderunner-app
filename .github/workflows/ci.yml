@@ -241,5 +241,18 @@ jobs:
       - name: Check the resolved configuration
         run: bin/kamal config
 
+      # Kamal boots the new container and stops the old one afterwards, which is
+      # right when the proxy owns the port. Here the container publishes
+      # 127.0.0.1:7000 itself, so the old one has to let go before the new one can
+      # bind -- otherwise every deploy after the first dies on "port is already
+      # allocated". Build and push first, so what goes dark is a boot and not a
+      # build. The cost is that a container which fails to start leaves the site
+      # down rather than the old one still serving.
+      - name: Build and push the image
+        run: bin/kamal build deliver
+
+      - name: Stop the running container
+        run: bin/kamal app stop
+
       - name: Deploy
-        run: bin/kamal deploy
+        run: bin/kamal deploy --skip-push

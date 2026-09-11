@@ -68,6 +68,30 @@ reviewer to the environment turns deployment into a manual approval, if you want
 | `BOOTSTRAP_ADMIN_GITHUB_LOGIN` | The login name that becomes admin on its first sign-in |
 | `RAILS_MASTER_KEY` | The contents of `config/master.key` |
 
+## Why the deploy job stops the container first
+
+Kamal boots the new container and stops the old one afterwards. That order is right
+when a proxy owns the port and can switch between them. Nothing owns the port here
+but the container itself, which publishes `127.0.0.1:7000`, so **the old container
+has to let go before the new one can bind** — and `kamal deploy` alone would fail on
+`Bind for 127.0.0.1:7000 failed: port is already allocated` on every deploy after the
+first. (`stale_containers --stop`, which `deploy` runs, deliberately spares the
+version that is currently running.)
+
+So the job splits what `kamal deploy` does:
+
+```sh
+bin/kamal build deliver      # build, push, pull onto the server
+bin/kamal app stop           # release 127.0.0.1:7000
+bin/kamal deploy --skip-push # boot the new one
+```
+
+The site is down between the stop and the boot — seconds, because the image is
+already on the server — and a container that fails to start leaves it down rather
+than falling back to the old one. Both are acceptable here and neither would be if
+this were shared. The way out of both is kamal-proxy bound to a private port, with
+Caddy in front of it; that also gives real HTTP health checks.
+
 ## opkssh on the VPS
 
 Install opkssh and allow GitHub Actions as an issuer.
@@ -112,6 +136,7 @@ answers the question the deploy does not.
 
 | Symptom | Cause |
 |---|---|
+| `Bind for 127.0.0.1:7000 failed: port is already allocated` | A container from an earlier deploy still holds the port, including one stuck in a restart loop. `docker rm -f $(docker ps -aq --filter label=service=mcp_coderunner_app)` on the VPS clears it |
 | The deploy is green but the site answers 502 | Caddy is still pointed at the old port. The container publishes to `127.0.0.1:7000` |
 | `Missing secret_key_base for 'production'` in the container log | `RAILS_MASTER_KEY` is empty. CI writes `config/master.key` from the secret, and an unset secret writes an empty file rather than failing |
 | `Net::SSH::AuthenticationFailed` | The opkssh principal and the token's `sub` disagree. `/var/log/opkssh.log` on the VPS says which subject it saw, and `no policy to allow` there means exactly this. The empty name in that message is the email claim, which a GitHub Actions token does not have — not the problem |
