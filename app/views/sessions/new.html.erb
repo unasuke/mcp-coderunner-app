@@ -4,7 +4,18 @@
   <h1><span class="gate-glyph" aria-hidden="true">📋</span> mcp-coderunner-app</h1>
   <p>Dockerfile とスクリプトを、隔離したコンテナで実行する仕組みの管理画面です。</p>
 
-  <%= button_to "GitHub でログイン", github_auth_path, method: :post, class: "btn-go", data: { turbo: false } %>
+  <% if Rails.configuration.x.mcp_coderunner_app.github_client_id.present? %>
+    <%= button_to "GitHub でログイン", github_auth_path, method: :post, class: "btn-go", data: { turbo: false } %>
+  <% else %>
+    <div class="empty">
+      <p>GitHub ログインが設定されていません。</p>
+      <p>
+        OAuth App を作り、コールバックを <code class="mono"><%= url_for(controller: "sessions", action: "create", only_path: false) %></code>
+        にしたうえで、<code class="mono">GITHUB_CLIENT_ID</code> と <code class="mono">GITHUB_CLIENT_SECRET</code>
+        を渡してサーバーを再起動してください。初期化ファイルは再読み込みされません。
+      </p>
+    </div>
+  <% end %>
 
   <% if Rails.configuration.x.mcp_coderunner_app.allow_developer_login %>
     <hr>

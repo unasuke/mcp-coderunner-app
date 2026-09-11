@@ -23,8 +23,8 @@ shared:
   process_retention_days: 30
   lease_retention_days: 30
 
-  # 最初のログインで admin になる GitHub のログイン名
-  bootstrap_admin_login: ~
+  # 最初のログインで admin になる GitHub のログイン名。どの環境でも環境変数から読む
+  bootstrap_admin_login: <%= ENV["BOOTSTRAP_ADMIN_GITHUB_LOGIN"] %>
 
   # ワーカーとのずれを検知するための実装のリビジョン
   commit_hash: development
@@ -41,14 +41,19 @@ shared:
 # config_for が shared を各環境にマージする
 development:
   allow_developer_login: true
-  # 開発用ログインでこの名前を入れると admin になる。ほかの名前は pending のまま
-  bootstrap_admin_login: dev
+  # 開発用ログインで dev と入れると admin になる。環境変数があればそちらが優先される
+  bootstrap_admin_login: <%= ENV.fetch("BOOTSTRAP_ADMIN_GITHUB_LOGIN", "dev") %>
 
 test:
   base_url: http://mcp-coderunner-app.invalid
+  # 実行環境の設定に左右されないよう、テストでは常に未設定から始める
+  bootstrap_admin_login: ~
+  # 値そのものは使わない。OmniAuth のモックを通すために、ストラテジが
+  # 生えている状態を作る（資格情報が無い環境では登録しないため）
+  github_client_id: test-client-id
+  github_client_secret: test-client-secret
 
 production:
   base_url: <%= ENV.fetch("MCP_CODERUNNER_APP_BASE_URL", "https://mcp-coderunner-app.example.com") %>
-  bootstrap_admin_login: <%= ENV["BOOTSTRAP_ADMIN_GITHUB_LOGIN"] %>
   # Kamal がデプロイするリビジョンを渡す。無ければビルド時に埋めた GIT_COMMIT
   commit_hash: <%= ENV["KAMAL_VERSION"] || ENV["GIT_COMMIT"] || "unknown" %>

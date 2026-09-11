@@ -10,7 +10,9 @@ Rails.application.routes.draw do
 
   # GitHub ログイン
   get "login" => "sessions#new", as: :login
-  post "auth/github", as: :github_auth
+  # 通常は OmniAuth のミドルウェアが受け取る。ここに届くのは
+  # GitHub の資格情報が設定されていないときだけ
+  post "auth/github" => "sessions#github", as: :github_auth
   get "auth/github/callback" => "sessions#create"
   # 開発用ログインのコールバック（OmniAuth のフォームから POST で来る）。
   # 設定が無効なら 404 を返す。ストラテジ自体も生えないので二重に閉じている

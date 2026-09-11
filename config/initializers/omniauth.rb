@@ -1,14 +1,17 @@
-# read:user のみ要求する。repo スコープは要らない。
+config = Rails.configuration.x.mcp_coderunner_app
+
 Rails.application.config.middleware.use OmniAuth::Builder do
-  provider :github,
-    Rails.configuration.x.mcp_coderunner_app.github_client_id,
-    Rails.configuration.x.mcp_coderunner_app.github_client_secret,
-    scope: "read:user"
+  # 資格情報が無いまま登録すると、client_id が空の URL で GitHub に飛ばされ、
+  # 「GitHub ログインが壊れている」ように見える。設定漏れは手前で言う
+  if config.github_client_id.present? && config.github_client_secret.present?
+    # read:user のみ要求する。repo スコープは要らない
+    provider :github, config.github_client_id, config.github_client_secret, scope: "read:user"
+  end
 
   # GitHub を経由しない開発用の口。設定で明示的に許可された環境にしか生えない。
   # セッションの発行から先は GitHub 経由とまったく同じ経路を通るので、
   # 認可フローの検証はこれで足りる。
-  if Rails.configuration.x.mcp_coderunner_app.allow_developer_login
+  if config.allow_developer_login
     provider :developer, fields: [ :nickname ], uid_field: :nickname
   end
 end

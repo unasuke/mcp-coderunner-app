@@ -20,6 +20,12 @@ class SessionsController < ApplicationController
     sign_in_with(request.env.fetch("omniauth.auth"))
   end
 
+  # OmniAuth が GitHub のストラテジを持っていないとここに落ちてくる
+  def github
+    redirect_to login_path,
+      alert: "GitHub ログインが設定されていません。GITHUB_CLIENT_ID と GITHUB_CLIENT_SECRET を入れて再起動してください"
+  end
+
   def failure
     redirect_to login_path, alert: "GitHub のログインに失敗しました"
   end
