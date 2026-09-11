@@ -7,7 +7,7 @@
 
 ## 前提
 
-- **Ruby 3.3 以上**と Docker。ほかは要らない（bundler も Gemfile.lock の同期も不要。ワーカーは stdlib だけで書かれている）。VPS 側の Ruby と揃える必要もない。
+- **Ruby 3.3 以上**と **rootless** Docker（3 章）。ほかは要らない（bundler も Gemfile.lock の同期も不要。ワーカーは stdlib だけで書かれている）。VPS 側の Ruby と揃える必要もない。
   - 想定しているのは**ディストリの ruby パッケージ**。unit は `/usr/bin/ruby` を実行する。バージョンマネージャだと、`nologin` のシステムユーザーから辿れない場所に処理系が置かれ、セキュリティ更新も apt の手を離れる。
   - 3.3 が下限なのは、インスタンスの識別に `SecureRandom.uuid_v7` を使っているため。古い Ruby では**入ってはいるが起動時に落ちる**。
 - VM に inbound の口を開けないこと。ワーカーは outbound のみ
@@ -21,8 +21,10 @@ VPS の `/admin/workers` で `worker_id`（例: `home-vm-01`）を入れて発�
 ## 2. VM 側を用意する
 
 ```sh
-sudo useradd --system --no-create-home --shell /usr/sbin/nologin mcp-coderunner-app
-sudo usermod -aG docker mcp-coderunner-app
+# ホームを持たせる。rootless の daemon がイメージストアをその下に置くため。
+# /home には作らない（ここに置くべきものは無く、実体は状態ファイル）
+sudo useradd --system --create-home --home-dir /var/lib/mcp-coderunner-app \
+  --shell /usr/sbin/nologin mcp-coderunner-app
 
 sudo git clone <このリポジトリ> /opt/mcp-coderunner-app
 cd /opt/mcp-coderunner-app && sudo git rev-parse HEAD | sudo tee /opt/mcp-coderunner-app/REVISION
@@ -39,14 +41,88 @@ sudo chown root:root /etc/mcp-coderunner-app/token
 `/etc/mcp-coderunner-app/token` は root しか読めない。ワーカーには systemd の `LoadCredential=` で渡るので、
 `mcp-coderunner-app` ユーザーがこのファイルを直接読める必要はない。
 
-## 3. firewall
+## 3. rootless Docker
+
+daemon を root ではなく `mcp-coderunner-app` で動かす。ソケットに届くことが
+「VM の root であること」と同義でなくなる。rootful の daemon に話せるワーカーは
+実質 root なので、ここが今回の眼目になる。
+
+**2 つ外すと、設計の一部が黙って成立しなくなる。**
+
+```sh
+sudo apt install -y uidmap docker-ce-rootless-extras
+which dockerd-rootless-setuptool.sh          # 後者のパッケージに入っている
+
+grep ^mcp-coderunner-app: /etc/subuid /etc/subgid   # 65536 個。useradd が書いていることが多い
+
+# daemon は systemd の *user* サービスなので、ログインしていなくても user manager が動く必要がある
+sudo loginctl enable-linger mcp-coderunner-app
+
+# rootless に既定で委譲されるのは memory と pids だけ。cpu が無いと --cpus も
+# bench を排他にする cpuset も「受け付けて無視」になり、適用していない
+# applied_limits をワーカーが報告し続けることになる
+sudo install -d /etc/systemd/system/user@.service.d
+printf '[Service]\nDelegate=cpu cpuset io memory pids\n' \
+  | sudo tee /etc/systemd/system/user@.service.d/delegate.conf
+sudo systemctl daemon-reload
+sudo reboot
+```
+
+再起動後、そのユーザーで daemon を入れる。ログインシェルが無いので、セッションの
+環境変数は手で渡す。
+
+```sh
+uid=$(id -u mcp-coderunner-app)
+
+sudo -u mcp-coderunner-app env \
+  XDG_RUNTIME_DIR=/run/user/$uid \
+  DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus \
+  PATH=/usr/bin:/bin \
+  dockerd-rootless-setuptool.sh install
+
+sudo -u mcp-coderunner-app env XDG_RUNTIME_DIR=/run/user/$uid \
+  systemctl --user enable --now docker
+```
+
+シェル無しで動かないときは、その場だけシェルを貸す（`sudo usermod -s /bin/bash
+mcp-coderunner-app`）。入れ終わったら `/usr/sbin/nologin` に戻す。
+
+unit にソケットの場所を教え、rootful の daemon は止めておく（間違って繋がないため）。
+
+```sh
+printf 'DOCKER_HOST=unix:///run/user/%s/docker.sock\n' "$uid" \
+  | sudo tee /etc/mcp-coderunner-app/worker.env
+
+sudo systemctl disable --now docker.service docker.socket
+```
+
+### 制限が本当に効いているか確かめる
+
+**ここは飛ばさない。**他が全部正常に見えたまま制限だけ効いていない状態がありえて、
+**適用していない制限を報告するワーカーは、動かないワーカーより悪い。**
+
+```sh
+uid=$(id -u mcp-coderunner-app)
+
+cat /sys/fs/cgroup/user.slice/user-$uid.slice/user@$uid.service/cgroup.controllers
+# cpu cpuset io memory pids が並ぶこと
+
+sudo -u mcp-coderunner-app env DOCKER_HOST=unix:///run/user/$uid/docker.sock \
+  docker run --rm --memory 64m --cpus 1 --pids-limit 32 alpine \
+  sh -c 'cat /sys/fs/cgroup/memory.max /sys/fs/cgroup/cpu.max /sys/fs/cgroup/pids.max'
+# 67108864 / 100000 100000 / 32 と出ること
+```
+
+どれかが `max` なら効いていない。実ジョブを流す前に委譲を直すこと。
+
+## 4. firewall
 
 ここだけは落とせない。**LAN 遮断を firewall 側で確実に効かせる。**
 
 | 経路 | ポリシー |
 |---|---|
-| コンテナ用ブリッジ → インターネット | 許可（build フェーズに必要） |
-| **コンテナ用ブリッジ → LAN** | **全拒否（ここだけは落とせない）** |
+| コンテナ → インターネット | 許可（build フェーズに必要） |
+| **コンテナ → LAN** | **全拒否（ここだけは落とせない）** |
 | VM 自身の outbound | 制限しない |
 | inbound | 全拒否 |
 
@@ -55,22 +131,36 @@ VM 自身の outbound を絞らないのは、**build フェーズに外向き�
 守れるものの割に更新や運用の手数が増える。守っているのは LAN への到達と inbound で、
 そこは変えない。
 
-nftables なら、docker のブリッジ（既定では `docker0`、`172.17.0.0/16`）から
-RFC1918 のアドレスへ出る通信を落とす。
+**rootless では書き方が変わる。**フィルタすべきブリッジが無い。rootlesskit が
+コンテナの通信をホストのネットワークスタックから出すので、firewall から見ると
+`mcp-coderunner-app` ユーザーの通信になる。output フックで uid を見る。
+`docker0` に対して書いたルール（rootful 用で、以前ここに書いてあったもの）は
+**何にも一致せず、何も守らない**。
 
 ```
 table inet mcp-coderunner-app {
-  chain forward {
-    type filter hook forward priority 0; policy accept;
-    iifname "docker0" ip daddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } drop
+  chain output {
+    type filter hook output priority 0; policy accept;
+    meta skuid <uid> ip daddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } drop
+    meta skuid <uid> ip6 daddr { fc00::/7, fe80::/10 } drop
   }
 }
+```
+
+ワーカー自身も同じユーザーで動くが、LAN に用は無いので巻き込んで構わない。
+LAN 上の応答するホストに対して、コンテナから確かめる。
+
+```sh
+uid=$(id -u mcp-coderunner-app)
+sudo -u mcp-coderunner-app env DOCKER_HOST=unix:///run/user/$uid/docker.sock \
+  docker run --rm alpine sh -c 'nc -z -w2 <ルーターのアドレス> 80; echo "exit=$?"'
+# exit=0 にならないこと
 ```
 
 実行コンテナは `--network none` で走るのでそもそも外に出られない。ここで守っているのは
 **build フェーズ**で、Blueprint のレビューと合わせて 2 段で効かせる。
 
-## 4. unit を置いて起動する
+## 5. unit を置いて起動する
 
 ```sh
 sudo cp /opt/mcp-coderunner-app/deploy/mcp-coderunner-app-worker.service /etc/systemd/system/
@@ -81,7 +171,7 @@ sudo systemctl enable --now mcp-coderunner-app-worker.service
 sudo systemctl enable --now mcp-coderunner-app-prune.timer
 ```
 
-## 5. 動作確認
+## 6. 動作確認
 
 ```sh
 # 1 行 1 イベントで出る
@@ -129,4 +219,6 @@ sudo /opt/mcp-coderunner-app/deploy/update-worker.sh
 | `image_build_failed` | `job_results.stderr` の末尾にビルドログが入っている |
 | 401 が続く | トークンが失効していないか（`/admin/workers`）。`/etc/mcp-coderunner-app/token` の中身に改行が混ざっていないか |
 | ビルドが `unknown flag: --tag` で落ちる | docker CLI がプラグインディレクトリを見失っている。Docker 29 では `build` は buildx プラグインが提供する。`ProtectHome=yes` によって `$HOME/.docker` が「無い」ではなく「読めない」になるのが原因で、CLI はこの 2 つを区別する。unit の `DOCKER_CONFIG` で回避しているので、古い unit のままなら置き直す |
+| ジョブの制限が `applied_limits` と一致しない | cpu が委譲されていない。3 章の確認 1 行で分かる。`/etc/systemd/system/user@.service.d/` の drop-in を置いて再起動する |
+| `Cannot connect to the Docker daemon` | `/etc/mcp-coderunner-app/worker.env` が無いか uid が違う。または user 側の daemon が動いていない: `sudo -u mcp-coderunner-app env XDG_RUNTIME_DIR=/run/user/$(id -u mcp-coderunner-app) systemctl --user status docker` |
 | コンテナが残る | `docker ps -a --filter label=mcp-coderunner-app.job`。unit の起動前・停止後の掃除で回収される |

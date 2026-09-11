@@ -1,11 +1,12 @@
 [Unit]
 Description=mcp-coderunner-app image prune
-After=docker.service
-Requires=docker.service
 
 [Service]
 Type=oneshot
 User=mcp-coderunner-app
-SupplementaryGroups=docker
 WorkingDirectory=/opt/mcp-coderunner-app
+
+# Same rootless socket the worker talks to
+EnvironmentFile=-/etc/mcp-coderunner-app/worker.env
+
 ExecStart=/usr/bin/ruby /opt/mcp-coderunner-app/bin/prune --config /etc/mcp-coderunner-app/config.yml

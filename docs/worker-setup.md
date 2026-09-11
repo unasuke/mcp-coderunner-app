@@ -8,7 +8,7 @@ rebuild the VM from it a few months from now.
 
 ## Assumptions
 
-- **Ruby 3.3 or newer**, and Docker. Nothing else: no bundler, no synced Gemfile.lock (the worker is written against stdlib alone), and no need to match the Ruby the VPS runs.
+- **Ruby 3.3 or newer**, and **rootless** Docker (section 3). Nothing else: no bundler, no synced Gemfile.lock (the worker is written against stdlib alone), and no need to match the Ruby the VPS runs.
   - The distribution's package is what this expects -- the unit runs `/usr/bin/ruby`. A version manager would put the interpreter somewhere a `nologin` system user cannot reach, and would take security updates off apt's hands.
   - 3.3 is the floor because the worker names instances with `SecureRandom.uuid_v7`. On an older Ruby it installs fine and dies at startup.
 - Nothing listens on the VM. The worker is outbound only
@@ -23,8 +23,10 @@ if you lose it, issue a new one.
 ## 2. Prepare the VM
 
 ```sh
-sudo useradd --system --no-create-home --shell /usr/sbin/nologin mcp-coderunner-app
-sudo usermod -aG docker mcp-coderunner-app
+# A home, because the rootless daemon keeps its image store under it. Not in /home:
+# nothing of this belongs there, and the image store is state.
+sudo useradd --system --create-home --home-dir /var/lib/mcp-coderunner-app \
+  --shell /usr/sbin/nologin mcp-coderunner-app
 
 sudo git clone <this repository> /opt/mcp-coderunner-app
 cd /opt/mcp-coderunner-app && sudo git rev-parse HEAD | sudo tee /opt/mcp-coderunner-app/REVISION
@@ -42,14 +44,92 @@ Only root can read `/etc/mcp-coderunner-app/token`. systemd hands it to the work
 through `LoadCredential=`, so the `mcp-coderunner-app` user never needs to read the
 file itself.
 
-## 3. Firewall
+## 3. Rootless Docker
+
+The daemon runs as `mcp-coderunner-app`, not as root. Reaching its socket then means
+being that user rather than being root on the VM — which is the whole point, since a
+worker that can talk to a rootful daemon is root in all but name.
+
+Two things have to be right or parts of this design quietly stop holding.
+
+```sh
+sudo apt install -y uidmap docker-ce-rootless-extras
+which dockerd-rootless-setuptool.sh          # comes from that second package
+
+grep ^mcp-coderunner-app: /etc/subuid /etc/subgid   # 65536 ids; useradd usually writes them
+
+# The daemon is a systemd *user* service, so the user manager has to run with nobody logged in
+sudo loginctl enable-linger mcp-coderunner-app
+
+# Rootless is delegated memory and pids by default and nothing else. Without cpu,
+# --cpus and the cpuset that keeps bench exclusive are accepted and ignored, and the
+# worker goes on reporting applied_limits that nothing is applying.
+sudo install -d /etc/systemd/system/user@.service.d
+printf '[Service]\nDelegate=cpu cpuset io memory pids\n' \
+  | sudo tee /etc/systemd/system/user@.service.d/delegate.conf
+sudo systemctl daemon-reload
+sudo reboot
+```
+
+After the reboot, install the daemon as that user. The account has no login shell, so
+hand it the session environment by hand:
+
+```sh
+uid=$(id -u mcp-coderunner-app)
+
+sudo -u mcp-coderunner-app env \
+  XDG_RUNTIME_DIR=/run/user/$uid \
+  DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus \
+  PATH=/usr/bin:/bin \
+  dockerd-rootless-setuptool.sh install
+
+sudo -u mcp-coderunner-app env XDG_RUNTIME_DIR=/run/user/$uid \
+  systemctl --user enable --now docker
+```
+
+If the tool refuses to run without a shell, lend the account one for the duration
+(`sudo usermod -s /bin/bash mcp-coderunner-app`), install, then put
+`/usr/sbin/nologin` back.
+
+Tell the units where the socket is, and take the rootful daemon out of the picture so
+nothing reaches it by accident:
+
+```sh
+printf 'DOCKER_HOST=unix:///run/user/%s/docker.sock\n' "$uid" \
+  | sudo tee /etc/mcp-coderunner-app/worker.env
+
+sudo systemctl disable --now docker.service docker.socket
+```
+
+### Check that the limits are real
+
+**This is the step not to skip.** Everything else can look right while the limits are
+being ignored, and a worker that reports limits it is not applying is worse than one
+that refuses to run.
+
+```sh
+uid=$(id -u mcp-coderunner-app)
+
+cat /sys/fs/cgroup/user.slice/user-$uid.slice/user@$uid.service/cgroup.controllers
+# must list: cpu cpuset io memory pids
+
+sudo -u mcp-coderunner-app env DOCKER_HOST=unix:///run/user/$uid/docker.sock \
+  docker run --rm --memory 64m --cpus 1 --pids-limit 32 alpine \
+  sh -c 'cat /sys/fs/cgroup/memory.max /sys/fs/cgroup/cpu.max /sys/fs/cgroup/pids.max'
+# must print: 67108864 / 100000 100000 / 32
+```
+
+`max` anywhere in that output means the limit is not being enforced. Fix the
+delegation before running anything real.
+
+## 4. Firewall
 
 This is the part that cannot slip. **Make the firewall enforce the LAN block.**
 
 | Path | Policy |
 |---|---|
-| container bridge → the internet | allowed (the build phase needs it) |
-| **container bridge → LAN** | **denied entirely (this is the part that cannot slip)** |
+| containers → the internet | allowed (the build phase needs it) |
+| **containers → LAN** | **denied entirely (this is the part that cannot slip)** |
 | the VM's own outbound | unrestricted |
 | inbound | denied entirely |
 
@@ -58,23 +138,38 @@ exit is already open** (design §9.2 accepts this). Closing off the VM itself wo
 little for what it costs in updates and day-to-day operation. What is being protected is
 reachability into the LAN, and inbound — and that does not change.
 
-Under nftables, drop traffic leaving docker's bridge (`docker0` and `172.17.0.0/16` by
-default) for an RFC1918 address.
+**Rootless changes how this has to be written.** There is no docker bridge to filter
+on: rootlesskit carries the container's traffic through the host's own network stack,
+so to the firewall it is traffic from the `mcp-coderunner-app` user. Match that, in
+the output hook. A rule written against `docker0` — which is what a rootful setup
+uses, and what this file said before — matches nothing here and protects nothing.
 
 ```
 table inet mcp-coderunner-app {
-  chain forward {
-    type filter hook forward priority 0; policy accept;
-    iifname "docker0" ip daddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } drop
+  chain output {
+    type filter hook output priority 0; policy accept;
+    meta skuid <uid> ip daddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } drop
+    meta skuid <uid> ip6 daddr { fc00::/7, fe80::/10 } drop
   }
 }
+```
+
+The worker runs as that user too, and has no reason to reach the LAN, so catching it
+in the same rule costs nothing. Check it from a container, against something on the
+LAN that answers:
+
+```sh
+uid=$(id -u mcp-coderunner-app)
+sudo -u mcp-coderunner-app env DOCKER_HOST=unix:///run/user/$uid/docker.sock \
+  docker run --rm alpine sh -c 'nc -z -w2 <the router> 80; echo "exit=$?"'
+# must not be exit=0
 ```
 
 Job containers run with `--network none`, so they cannot reach anything to begin with.
 What this protects is the **build phase**, and together with Blueprint review it makes
 two layers.
 
-## 4. Install the units and start them
+## 5. Install the units and start them
 
 ```sh
 sudo cp /opt/mcp-coderunner-app/deploy/mcp-coderunner-app-worker.service /etc/systemd/system/
@@ -85,7 +180,7 @@ sudo systemctl enable --now mcp-coderunner-app-worker.service
 sudo systemctl enable --now mcp-coderunner-app-prune.timer
 ```
 
-## 5. Check that it works
+## 6. Check that it works
 
 ```sh
 # one line per event
@@ -138,4 +233,6 @@ expire.
 | `image_build_failed` | The build log is at the tail of `job_results.stderr` |
 | repeated 401s | Has the token been revoked (`/admin/workers`)? Did a newline get into `/etc/mcp-coderunner-app/token`? |
 | `unknown flag: --tag` from a build | The docker CLI lost its plugin directory, and `build` is the buildx plugin. `ProtectHome=yes` turns the service's `$HOME/.docker` from missing into unreadable, which is what the CLI cannot take. The unit sets `DOCKER_CONFIG` for this; a unit older than that needs recopying |
+| a job's limits do not match `applied_limits` | The cpu controller is not delegated. Section 3's check says so in one line; the drop-in under `/etc/systemd/system/user@.service.d/` is the fix, and it needs a reboot |
+| `Cannot connect to the Docker daemon` | `/etc/mcp-coderunner-app/worker.env` is missing or has the wrong uid, or the user's daemon is not running: `sudo -u mcp-coderunner-app env XDG_RUNTIME_DIR=/run/user/$(id -u mcp-coderunner-app) systemctl --user status docker` |
 | containers pile up | `docker ps -a --filter label=mcp-coderunner-app.job`. The unit sweeps them before it starts and after it stops |
