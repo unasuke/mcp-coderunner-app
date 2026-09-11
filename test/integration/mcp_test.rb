@@ -182,16 +182,24 @@ class McpTest < ActionDispatch::IntegrationTest
     assert_equal({ "memory_mb" => 2048 }, payload["applied_limits"])
   end
 
-  # 保持期間を過ぎたことが応答から読めれば、結果が空なのを実行の失敗と誤読しない
-  test "a purged job says so" do
+  # 保持期間を過ぎたことが応答から読めれば、結果が空なのを実行の失敗と誤読しない。
+  # 終了理由まで消えると「まだ結果が無い」と区別がつかなくなる
+  test "a purged job keeps its reason and says the body is gone" do
     blueprint = Blueprint.create!(name: "ready", summary: "y", dockerfile: "FROM b\n",
       digest: Blueprint.digest_for(dockerfile: "FROM b\n", files: []), state: :approved)
-    job = Job.create!(blueprint:, script: "", profile: "default", state: :finished, purged_at: Time.current)
+    job = Job.create!(blueprint:, script: "puts 1", profile: "default", state: :finished,
+      created_at: 100.days.ago, updated_at: 100.days.ago)
+    JobResult.create!(job:, termination_reason: "oom_killed", exit_code: 137, stdout: "x" * 100,
+      stderr: "", applied_limits: { "memory_mb" => 2048 }, created_at: 40.days.ago)
 
+    RetentionJob.new.perform
     payload, = tool("get_job", { job_id: job.id })
 
     assert payload["purged_at"]
+    assert_equal "oom_killed", payload["termination_reason"]
+    assert_equal 137, payload["exit_code"]
     assert_nil payload["stdout"]
+    assert_nil payload["stderr"]
   end
 
   test "the oauth metadata is public" do

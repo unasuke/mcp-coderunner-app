@@ -22,21 +22,27 @@ module McpTools
                   blueprint_digest: job.blueprint.digest }
       payload[:review_url] = review_url("/admin/jobs/#{job.id}") if job.pending_review?
       # 保持期間を過ぎたことが応答から読めれば、結果が空なのを実行の失敗と誤読しない
-      return payload.merge(purged_at: job.purged_at.utc.iso8601) if job.purged?
+      payload[:purged_at] = job.purged_at.utc.iso8601 if job.purged?
 
       result = job.job_result
       return payload unless result
 
-      payload.merge(
+      payload.merge!(
         termination_reason: result.termination_reason,
         exit_code: result.exit_code,
-        stdout: result.stdout,
-        stderr: result.stderr,
-        truncated: result.truncated,
         duration_ms: result.duration_ms,
         cpu_time_ms: result.cpu_time_ms,
         max_rss_bytes: result.max_rss_bytes,
         applied_limits: result.applied_limits
+      )
+
+      # 本文は保持期間で消える。終了理由は消さない
+      return payload if job.purged?
+
+      payload.merge(
+        stdout: result.stdout,
+        stderr: result.stderr,
+        truncated: result.truncated
       )
     end
   end

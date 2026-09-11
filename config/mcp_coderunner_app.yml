@@ -17,6 +17,7 @@ shared:
   blueprint_list_limit: 50
 
   # 保持期間（日）
+  refresh_token_retention_days: 30
   result_retention_days: 30
   script_retention_days: 90
   process_retention_days: 30
