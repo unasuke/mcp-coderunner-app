@@ -148,6 +148,11 @@ jobs:
     needs: [ scan_ruby, lint, worker, test, system-test ]
     runs-on: ubuntu-latest
 
+    # デプロイに使う値はこの environment の secret に入れてある。
+    # environment を宣言すると OIDC トークンの sub も
+    # repo:<owner>/<repo>:environment:production になる（opkssh の auth_id と揃える）
+    environment: production
+
     # 同時に 2 本走らせない。走っている分は最後まで流す
     concurrency:
       group: deploy

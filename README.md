@@ -93,6 +93,10 @@ GitHub Actions の OIDC トークンで入る。
 ghcr.io への push と VPS からの pull には `GITHUB_TOKEN` を使う。ジョブの寿命だけ有効なので、
 **VPS に残る資格情報も同じ時間で切れる**（パッケージを public にすれば pull に資格情報は要らなくなる）。
 
+値は GitHub の environment `production` の secret に入れる。`deploy` ジョブだけがこの
+environment を宣言しているので、ほかのジョブからは読めない。必要なら environment 側に
+承認者を設定して、デプロイを手動承認にできる。
+
 必要な secret:
 
 | secret | 中身 |
@@ -111,10 +115,14 @@ VPS 側は opkssh を入れて、GitHub Actions を発行者として許可す�
 https://token.actions.githubusercontent.com github oidc
 
 # /etc/opk/auth_id  （<ログインさせる Linux ユーザー> <主体> <発行者>）
-root repo:unasuke/mcp-coderunner-app:ref:refs/heads/main https://token.actions.githubusercontent.com
+root repo:unasuke/mcp-coderunner-app:environment:production https://token.actions.githubusercontent.com
 ```
 
-`main` のワークフローからしか入れない。ブランチやフォークの CI は主体が一致しないので弾かれる。
+**主体は environment で書く。**ジョブが environment を宣言すると、OIDC トークンの `sub` は
+`...:ref:refs/heads/main` ではなく `...:environment:production` になる。ブランチ名で書くと弾かれる。
+
+この 1 行が、`main` の `deploy` ジョブ以外を入れないための唯一の関門になる。
+ブランチやフォークの CI は environment を宣言できないので主体が一致しない。
 
 リポジトリを public にしたらパッケージも public にしてよい。イメージの中身は
 公開済みのソースなので隠す意味がなく、public にすればサーバー側は資格情報なしで
