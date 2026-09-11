@@ -83,7 +83,10 @@ hand it the session environment by hand:
 ```sh
 uid=$(id -u mcp-coderunner-app)
 
+# HOME among them: sudo does not set it to the target account's, and the tool
+# stops with "HOME needs to be set"
 sudo -u mcp-coderunner-app env \
+  HOME=/var/lib/mcp-coderunner-app \
   XDG_RUNTIME_DIR=/run/user/$uid \
   DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus \
   PATH=/usr/bin:/bin \

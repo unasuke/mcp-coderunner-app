@@ -79,7 +79,10 @@ sudo reboot
 ```sh
 uid=$(id -u mcp-coderunner-app)
 
+# HOME も渡す。sudo は対象アカウントのものを設定しないので、
+# 渡さないと "HOME needs to be set" で止まる
 sudo -u mcp-coderunner-app env \
+  HOME=/var/lib/mcp-coderunner-app \
   XDG_RUNTIME_DIR=/run/user/$uid \
   DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus \
   PATH=/usr/bin:/bin \
