@@ -12,14 +12,18 @@ module Admin
     end
 
     def approve
-      return redirect_to(admin_job_path(@job), alert: "承認できる状態ではありません") unless @job.approvable?
+      unless @job.approvable?
+        return redirect_to admin_job_path(@job),
+          alert: "実行環境が #{@job.blueprint.state} です。先に実行環境を承認してください"
+      end
 
       @job.approve!(by: current_user)
       redirect_to admin_job_path(@job), notice: "承認しました"
     end
 
+    # 却下は実行環境の状態を問わない。承認できないジョブを溜めたままにしない
     def reject
-      return redirect_to(admin_job_path(@job), alert: "却下できる状態ではありません") unless @job.approvable?
+      return redirect_to(admin_job_path(@job), alert: "却下できる状態ではありません") unless @job.pending_review?
 
       @job.reject!(by: current_user)
       redirect_to admin_job_path(@job), notice: "却下しました"

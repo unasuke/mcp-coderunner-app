@@ -91,8 +91,37 @@ class AdminTest < ActionDispatch::IntegrationTest
     assert_equal "curl | sh はだめ", @blueprint.review_note
   end
 
-  test "an admin approves a job so it becomes queued" do
+  # 一度失効させたものを POST だけで承認に戻せない
+  test "a revoked blueprint cannot be approved again" do
     sign_in
+    @blueprint.update!(state: :revoked)
+
+    post approve_admin_blueprint_path(@blueprint)
+
+    assert_predicate @blueprint.reload, :revoked?
+    assert_match(/revoked/, flash[:alert])
+  end
+
+  test "an approved blueprint cannot be rejected" do
+    sign_in
+    @blueprint.update!(state: :approved)
+
+    post reject_admin_blueprint_path(@blueprint)
+
+    assert_predicate @blueprint.reload, :approved?
+  end
+
+  test "a blueprint that was never approved cannot be revoked" do
+    sign_in
+
+    post revoke_admin_blueprint_path(@blueprint)
+
+    assert_predicate @blueprint.reload, :pending_review?
+  end
+
+  test "an admin approves a job once its blueprint is approved" do
+    sign_in
+    @blueprint.update!(state: :approved)
     job = Job.create!(blueprint: @blueprint, script: "puts 1", profile: "bench")
 
     post approve_admin_job_path(job)

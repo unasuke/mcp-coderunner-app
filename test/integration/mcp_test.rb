@@ -103,6 +103,28 @@ class McpTest < ActionDispatch::IntegrationTest
     assert_match %r{/admin/jobs/\d+}, payload["review_url"]
   end
 
+  # 一度断った内容は digest を知っていても投げ直せない
+  test "submit_job refuses a rejected or revoked blueprint" do
+    rejected = Blueprint.create!(name: "no", summary: "x", dockerfile: "FROM a\n",
+      digest: Blueprint.digest_for(dockerfile: "FROM a\n", files: []),
+      state: :rejected, review_note: "curl | sh はだめ")
+    revoked = Blueprint.create!(name: "gone", summary: "y", dockerfile: "FROM b\n",
+      digest: Blueprint.digest_for(dockerfile: "FROM b\n", files: []), state: :revoked)
+
+    assert_no_difference -> { Job.count } do
+      payload, error = tool("submit_job", { blueprint: rejected.digest, script: "puts 1" })
+
+      assert error
+      assert_equal "not_approved", payload["error"]
+      assert_equal "curl | sh はだめ", payload["review_note"]
+
+      payload, error = tool("submit_job", { blueprint: revoked.digest, script: "puts 1" })
+
+      assert error
+      assert_equal "not_approved", payload["error"]
+    end
+  end
+
   # bench は承認が要る
   test "the bench profile waits for review" do
     Blueprint.create!(name: "ready", summary: "y", dockerfile: "FROM b\n",

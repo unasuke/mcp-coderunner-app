@@ -87,6 +87,13 @@
     <div class="empty">
       <p>承認するまで実行されません。</p>
       <p>プロファイルが <code class="mono">default</code> でない、スクリプトが 64KB を超える、実行環境が未承認、のいずれかに当たっています。</p>
+      <% unless @job.blueprint.approved? %>
+        <p class="warn">
+          実行環境 <%= link_to @job.blueprint.name, admin_blueprint_path(@job.blueprint) %> が
+          <%= @job.blueprint.state %> です。Dockerfile を読んで先に実行環境を承認してください。
+          このジョブはそれまで承認できません。
+        </p>
+      <% end %>
     </div>
   <% else %>
     <h2>結果</h2>
@@ -137,6 +144,9 @@
   <div class="actions">
     <% if @job.approvable? %>
       <%= button_to "承認して実行する", approve_admin_job_path(@job), class: "btn-go" %>
+      <%= button_to "却下する", reject_admin_job_path(@job), class: "btn-stop",
+            form: { data: { turbo_confirm: "このジョブを却下します。実行されません。" } } %>
+    <% elsif @job.pending_review? %>
       <%= button_to "却下する", reject_admin_job_path(@job), class: "btn-stop",
             form: { data: { turbo_confirm: "このジョブを却下します。実行されません。" } } %>
     <% elsif @job.cancellable? %>

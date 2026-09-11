@@ -1,4 +1,6 @@
 class Job < ApplicationRecord
+  NotApprovable = Class.new(StandardError)
+
   STATES = %w[ pending_review rejected queued leased running finished ].freeze
   # 検証用のスクリプトは普通は数 KB に収まる。これを超えている時点で何か変なことが起きている
   def self.review_script_bytes = Rails.configuration.x.mcp_coderunner_app.script_review_bytes
@@ -45,9 +47,11 @@ class Job < ApplicationRecord
     purged_at.present?
   end
 
-  # pending_review には承認と却下だけを置き、queued 以降にはキャンセルだけを置く
+  # pending_review には承認と却下だけを置き、queued 以降にはキャンセルだけを置く。
+  # Blueprint が承認されるまでは承認できない。Dockerfile を読まずに実行へ進む
+  # 経路を作らないため（digest を指定すれば未承認の Blueprint でもジョブは作れる）
   def approvable?
-    pending_review?
+    pending_review? && blueprint.approved?
   end
 
   def cancellable?
@@ -59,10 +63,14 @@ class Job < ApplicationRecord
   end
 
   def approve!(by:)
+    raise NotApprovable, "blueprint #{blueprint.digest} is #{blueprint.state}" unless approvable?
+
     update!(state: :queued, approved_by: by)
   end
 
   def reject!(by:)
+    raise NotApprovable, "job is #{state}" unless pending_review?
+
     update!(state: :rejected, approved_by: by)
   end
 

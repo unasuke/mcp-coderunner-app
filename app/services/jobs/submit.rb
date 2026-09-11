@@ -23,6 +23,7 @@ module Jobs
     def call
       validate!
       blueprint = resolve_blueprint
+      reject_withdrawn!(blueprint)
 
       Job.create!(
         blueprint:,
@@ -46,6 +47,16 @@ module Jobs
 
       raise McpToolError.new(:script_too_large,
         "script が大きすぎます: #{@script.bytesize} バイト（上限 #{Job.max_script_bytes}）")
+    end
+
+    # 一度人間が断った内容は、digest を知っていても投げ直せない。
+    # revoked が止めるのは新規投入なので、キューに残っているものには影響しない
+    def reject_withdrawn!(blueprint)
+      return unless blueprint.rejected? || blueprint.revoked?
+
+      raise McpToolError.new(:not_approved,
+        "この Blueprint は #{blueprint.state} です: #{blueprint.digest}",
+        review_note: blueprint.review_note)
     end
 
     # digest ならそのまま引く。name なら同名で最新の approved を使う
