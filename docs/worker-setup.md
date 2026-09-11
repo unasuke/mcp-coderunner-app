@@ -8,7 +8,9 @@ rebuild the VM from it a few months from now.
 
 ## Assumptions
 
-- Ruby and Docker are installed on the VM. Neither bundler nor a synced Gemfile.lock is needed (the worker is written against stdlib alone)
+- **Ruby 3.3 or newer**, and Docker. Nothing else: no bundler, no synced Gemfile.lock (the worker is written against stdlib alone), and no need to match the Ruby the VPS runs.
+  - The distribution's package is what this expects -- the unit runs `/usr/bin/ruby`. A version manager would put the interpreter somewhere a `nologin` system user cannot reach, and would take security updates off apt's hands.
+  - 3.3 is the floor because the worker names instances with `SecureRandom.uuid_v7`. On an older Ruby it installs fine and dies at startup.
 - Nothing listens on the VM. The worker is outbound only
 - No Tailscale on the VM. The boundary is the VM's firewall, in one place
 

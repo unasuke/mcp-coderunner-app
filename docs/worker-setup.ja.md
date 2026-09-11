@@ -7,7 +7,9 @@
 
 ## 前提
 
-- VM に Ruby と Docker が入っていること。bundler も Gemfile.lock の同期も要らない（ワーカーは stdlib だけで書かれている）
+- **Ruby 3.3 以上**と Docker。ほかは要らない（bundler も Gemfile.lock の同期も不要。ワーカーは stdlib だけで書かれている）。VPS 側の Ruby と揃える必要もない。
+  - 想定しているのは**ディストリの ruby パッケージ**。unit は `/usr/bin/ruby` を実行する。バージョンマネージャだと、`nologin` のシステムユーザーから辿れない場所に処理系が置かれ、セキュリティ更新も apt の手を離れる。
+  - 3.3 が下限なのは、インスタンスの識別に `SecureRandom.uuid_v7` を使っているため。古い Ruby では**入ってはいるが起動時に落ちる**。
 - VM に inbound の口を開けないこと。ワーカーは outbound のみ
 - VM に Tailscale を入れないこと。境界は VM の firewall 一箇所
 
