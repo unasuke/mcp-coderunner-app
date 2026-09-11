@@ -53,7 +53,12 @@ daemon を root ではなく `mcp-coderunner-app` で動かす。ソケットに
 sudo apt install -y uidmap docker-ce-rootless-extras
 which dockerd-rootless-setuptool.sh          # 後者のパッケージに入っている
 
-grep ^mcp-coderunner-app: /etc/subuid /etc/subgid   # 65536 個。useradd が書いていることが多い
+# subordinate id。useradd が書くのは通常アカウントのときだけで、--system では
+# 書かれないので手で足す。ほかと重ならない範囲なら値は任意、幅は 65536 以上
+# （最初のログインユーザーが 100000-165535 を持っていることが多い）
+cat /etc/subuid /etc/subgid
+sudo usermod --add-subuids 200000-265535 --add-subgids 200000-265535 mcp-coderunner-app
+grep ^mcp-coderunner-app: /etc/subuid /etc/subgid   # 空で返らないこと
 
 # daemon は systemd の *user* サービスなので、ログインしていなくても user manager が動く必要がある
 sudo loginctl enable-linger mcp-coderunner-app
@@ -220,5 +225,6 @@ sudo /opt/mcp-coderunner-app/deploy/update-worker.sh
 | 401 が続く | トークンが失効していないか（`/admin/workers`）。`/etc/mcp-coderunner-app/token` の中身に改行が混ざっていないか |
 | ビルドが `unknown flag: --tag` で落ちる | docker CLI がプラグインディレクトリを見失っている。Docker 29 では `build` は buildx プラグインが提供する。`ProtectHome=yes` によって `$HOME/.docker` が「無い」ではなく「読めない」になるのが原因で、CLI はこの 2 つを区別する。unit の `DOCKER_CONFIG` で回避しているので、古い unit のままなら置き直す |
 | ジョブの制限が `applied_limits` と一致しない | cpu が委譲されていない。3 章の確認 1 行で分かる。`/etc/systemd/system/user@.service.d/` の drop-in を置いて再起動する |
+| setup ツールが subuid/subgid が無いと言って止まる | `useradd --system` は割り当てない。`sudo usermod --add-subuids 200000-265535 --add-subgids 200000-265535 mcp-coderunner-app` のあと user 側の docker を再起動する |
 | `Cannot connect to the Docker daemon` | `/etc/mcp-coderunner-app/worker.env` が無いか uid が違う。または user 側の daemon が動いていない: `sudo -u mcp-coderunner-app env XDG_RUNTIME_DIR=/run/user/$(id -u mcp-coderunner-app) systemctl --user status docker` |
 | コンテナが残る | `docker ps -a --filter label=mcp-coderunner-app.job`。unit の起動前・停止後の掃除で回収される |

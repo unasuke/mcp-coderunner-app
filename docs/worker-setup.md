@@ -56,7 +56,13 @@ Two things have to be right or parts of this design quietly stop holding.
 sudo apt install -y uidmap docker-ce-rootless-extras
 which dockerd-rootless-setuptool.sh          # comes from that second package
 
-grep ^mcp-coderunner-app: /etc/subuid /etc/subgid   # 65536 ids; useradd usually writes them
+# Subordinate ids. useradd writes these for a normal account and not for a --system
+# one, so they have to be added by hand. Any range that overlaps nothing else will
+# do, and it has to be at least 65536 wide (the first login user usually holds
+# 100000-165535).
+cat /etc/subuid /etc/subgid
+sudo usermod --add-subuids 200000-265535 --add-subgids 200000-265535 mcp-coderunner-app
+grep ^mcp-coderunner-app: /etc/subuid /etc/subgid   # must not come back empty
 
 # The daemon is a systemd *user* service, so the user manager has to run with nobody logged in
 sudo loginctl enable-linger mcp-coderunner-app
@@ -234,5 +240,6 @@ expire.
 | repeated 401s | Has the token been revoked (`/admin/workers`)? Did a newline get into `/etc/mcp-coderunner-app/token`? |
 | `unknown flag: --tag` from a build | The docker CLI lost its plugin directory, and `build` is the buildx plugin. `ProtectHome=yes` turns the service's `$HOME/.docker` from missing into unreadable, which is what the CLI cannot take. The unit sets `DOCKER_CONFIG` for this; a unit older than that needs recopying |
 | a job's limits do not match `applied_limits` | The cpu controller is not delegated. Section 3's check says so in one line; the drop-in under `/etc/systemd/system/user@.service.d/` is the fix, and it needs a reboot |
+| the setup tool refuses: no subuid/subgid range | `useradd --system` does not allocate them. `sudo usermod --add-subuids 200000-265535 --add-subgids 200000-265535 mcp-coderunner-app`, then restart the user's docker |
 | `Cannot connect to the Docker daemon` | `/etc/mcp-coderunner-app/worker.env` is missing or has the wrong uid, or the user's daemon is not running: `sudo -u mcp-coderunner-app env XDG_RUNTIME_DIR=/run/user/$(id -u mcp-coderunner-app) systemctl --user status docker` |
 | containers pile up | `docker ps -a --filter label=mcp-coderunner-app.job`. The unit sweeps them before it starts and after it stops |
