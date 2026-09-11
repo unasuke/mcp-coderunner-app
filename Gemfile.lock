@@ -483,6 +483,7 @@ DEPENDENCIES
   reactionview (~> 0.4.1)
   rouge (~> 5.1)
   rubocop-rails-omakase
+  ruby-vips
   selenium-webdriver
   solid_cable
   solid_cache
