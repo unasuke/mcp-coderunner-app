@@ -1,58 +1,63 @@
-# ワーカーのセットアップ
+# Setting up the worker
 
-自宅 VM で `bin/worker` を動かすまでの手順。**なぜこの形なのかは設計書にある**ので、ここでは手順だけ書く。
-基準は「数ヶ月後の自分が VM を作り直せること」。
+*[日本語](worker-setup.ja.md)*
 
-## 前提
+How to get `bin/worker` running on the home VM. **The reasoning behind this shape is in
+the design document**, so this file is procedure only. The bar it aims at: that I can
+rebuild the VM from it a few months from now.
 
-- VM に Ruby と Docker が入っていること。bundler も Gemfile.lock の同期も要らない（ワーカーは stdlib だけで書かれている）
-- VM に inbound の口を開けないこと。ワーカーは outbound のみ
-- VM に Tailscale を入れないこと。境界は VM の firewall 一箇所
+## Assumptions
 
-## 1. トークンを発行する
+- Ruby and Docker are installed on the VM. Neither bundler nor a synced Gemfile.lock is needed (the worker is written against stdlib alone)
+- Nothing listens on the VM. The worker is outbound only
+- No Tailscale on the VM. The boundary is the VM's firewall, in one place
 
-VPS の `/admin/workers` で `worker_id`（例: `home-vm-01`）を入れて発行する。
-**平文はその場で 1 度だけ表示される。** 閉じたら二度と見られないので、無くしたら再発行する。
+## 1. Issue a token
 
-## 2. VM 側を用意する
+Enter a `worker_id` (for example `home-vm-01`) at `/admin/workers` on the VPS.
+**The plaintext is shown once, right there.** Close the page and it is gone for good;
+if you lose it, issue a new one.
+
+## 2. Prepare the VM
 
 ```sh
 sudo useradd --system --no-create-home --shell /usr/sbin/nologin mcp-coderunner-app
 sudo usermod -aG docker mcp-coderunner-app
 
-sudo git clone <このリポジトリ> /opt/mcp-coderunner-app
+sudo git clone <this repository> /opt/mcp-coderunner-app
 cd /opt/mcp-coderunner-app && sudo git rev-parse HEAD | sudo tee /opt/mcp-coderunner-app/REVISION
 
 sudo install -d -m 0755 /etc/mcp-coderunner-app
 sudo cp /opt/mcp-coderunner-app/worker/config.example.yml /etc/mcp-coderunner-app/config.yml
-sudo $EDITOR /etc/mcp-coderunner-app/config.yml          # worker_id と endpoint を書く
+sudo $EDITOR /etc/mcp-coderunner-app/config.yml          # fill in worker_id and endpoint
 
-printf '%s' '<発行されたトークン>' | sudo tee /etc/mcp-coderunner-app/token > /dev/null
+printf '%s' '<the token you were given>' | sudo tee /etc/mcp-coderunner-app/token > /dev/null
 sudo chmod 0400 /etc/mcp-coderunner-app/token
 sudo chown root:root /etc/mcp-coderunner-app/token
 ```
 
-`/etc/mcp-coderunner-app/token` は root しか読めない。ワーカーには systemd の `LoadCredential=` で渡るので、
-`mcp-coderunner-app` ユーザーがこのファイルを直接読める必要はない。
+Only root can read `/etc/mcp-coderunner-app/token`. systemd hands it to the worker
+through `LoadCredential=`, so the `mcp-coderunner-app` user never needs to read the
+file itself.
 
-## 3. firewall
+## 3. Firewall
 
-ここだけは落とせない。**LAN 遮断を firewall 側で確実に効かせる。**
+This is the part that cannot slip. **Make the firewall enforce the LAN block.**
 
-| 経路 | ポリシー |
+| Path | Policy |
 |---|---|
-| コンテナ用ブリッジ → インターネット | 許可（build フェーズに必要） |
-| **コンテナ用ブリッジ → LAN** | **全拒否（ここだけは落とせない）** |
-| VM 自身の outbound | 制限しない |
-| inbound | 全拒否 |
+| container bridge → the internet | allowed (the build phase needs it) |
+| **container bridge → LAN** | **denied entirely (this is the part that cannot slip)** |
+| the VM's own outbound | unrestricted |
+| inbound | denied entirely |
 
-VM 自身の outbound を絞らないのは、**build フェーズに外向きの通信路がある時点で
-出口は既に開いているから**（設計 §9.2 で受け入れている）。VM 本体だけを塞いでも、
-守れるものの割に更新や運用の手数が増える。守っているのは LAN への到達と inbound で、
-そこは変えない。
+The VM's own outbound is left alone because **once the build phase has a path out, the
+exit is already open** (design §9.2 accepts this). Closing off the VM itself would buy
+little for what it costs in updates and day-to-day operation. What is being protected is
+reachability into the LAN, and inbound — and that does not change.
 
-nftables なら、docker のブリッジ（既定では `docker0`、`172.17.0.0/16`）から
-RFC1918 のアドレスへ出る通信を落とす。
+Under nftables, drop traffic leaving docker's bridge (`docker0` and `172.17.0.0/16` by
+default) for an RFC1918 address.
 
 ```
 table inet mcp-coderunner-app {
@@ -63,10 +68,11 @@ table inet mcp-coderunner-app {
 }
 ```
 
-実行コンテナは `--network none` で走るのでそもそも外に出られない。ここで守っているのは
-**build フェーズ**で、Blueprint のレビューと合わせて 2 段で効かせる。
+Job containers run with `--network none`, so they cannot reach anything to begin with.
+What this protects is the **build phase**, and together with Blueprint review it makes
+two layers.
 
-## 4. unit を置いて起動する
+## 4. Install the units and start them
 
 ```sh
 sudo cp /opt/mcp-coderunner-app/deploy/mcp-coderunner-app-worker.service /etc/systemd/system/
@@ -77,51 +83,56 @@ sudo systemctl enable --now mcp-coderunner-app-worker.service
 sudo systemctl enable --now mcp-coderunner-app-prune.timer
 ```
 
-## 5. 動作確認
+## 5. Check that it works
 
 ```sh
-# 1 行 1 イベントで出る
+# one line per event
 sudo journalctl -u mcp-coderunner-app-worker -f
 ```
 
-`/admin/workers` にインスタンスが出て、最終 heartbeat が 30 秒ごとに更新されていれば動いている。
-commit がサーバー側とずれていると行に警告が出る。
+It is working if the instance shows up at `/admin/workers` and its last heartbeat
+advances every 30 seconds. The row carries a warning when its commit has drifted from
+the server's.
 
-素の ruby で読めるかどうかだけは、VM に置く前に確かめられる。
+One thing can be checked before any of this reaches the VM: whether plain ruby can load
+the worker.
 
 ```sh
 ruby -Ilib -I. -e 'require "worker/runner"'
 ```
 
-これが落ちるときは、ワーカーか `lib/protocol` に ActiveSupport の拡張（`blank?`、`1.hour` など）が
-混ざっている。開発機では Rails 経由で通ってしまうので、人間のレビューでは捕まえられない。
+When that fails, an ActiveSupport extension (`blank?`, `1.hour`, and the like) has found
+its way into the worker or into `lib/protocol`. On a development machine it loads
+anyway, by way of Rails, which is why human review does not catch it.
 
-## 更新する
+## Updating
 
 ```sh
 sudo /opt/mcp-coderunner-app/deploy/update-worker.sh
 ```
 
-`origin/main` に合わせて、`REVISION` を書き直し、unit を再起動する。
-`git pull` ではなく `git reset --hard` なので、手元に差分が残っていても結果が一意になる。
-`bundle install` は要らない（ワーカーは stdlib だけで書かれている）。
+It brings the checkout in line with `origin/main`, rewrites `REVISION`, and restarts the
+unit. It uses `git reset --hard` rather than `git pull`, so the result is the same
+whether or not the checkout was dirty. No `bundle install` (the worker is written
+against stdlib alone).
 
-**引き金は人間か VM 側の timer が引く。VPS には引かせない。** heartbeat の `outdated` を見て
-自動更新する形にすると、VPS が VM で動くコードを決められることになり、
-「ワーカーは VPS を信用しない」という土台が崩れる。
+**A human or a timer on the VM pulls the trigger. Never the VPS.** Wiring this to the
+`outdated` flag in the heartbeat would let the VPS decide what code runs on the VM,
+which knocks out the foundation: the worker does not trust the VPS.
 
-戻すときは同じ手順で、`git reset --hard <SHA>` を指すようにする。ビルド成果物が無いので
-チェックアウトを戻して再起動するだけで済む。
+Rolling back is the same procedure pointed at `git reset --hard <SHA>`. There is nothing
+built, so moving the checkout and restarting is all of it.
 
-再起動時はワーカーが `/deregister` を打つので、走りかけのジョブは即座にキューへ戻る。
-リースのタイムアウトも heartbeat の失効判定も待たない。
+On restart the worker calls `/deregister`, so a job that was mid-flight goes straight
+back to the queue. Nothing waits for the lease to time out or for the heartbeat to
+expire.
 
-## 困ったとき
+## When something is wrong
 
-| 症状 | 見るところ |
+| Symptom | Where to look |
 |---|---|
-| ジョブが `queued` のまま動かない | `/admin/workers` にインスタンスが出ているか。`drain` が立っていないか（protocol_version のずれ） |
-| `policy_rejected` が返る | `/etc/mcp-coderunner-app/config.yml` の上限と、Blueprint の context のパス |
-| `image_build_failed` | `job_results.stderr` の末尾にビルドログが入っている |
-| 401 が続く | トークンが失効していないか（`/admin/workers`）。`/etc/mcp-coderunner-app/token` の中身に改行が混ざっていないか |
-| コンテナが残る | `docker ps -a --filter label=mcp-coderunner-app.job`。unit の起動前・停止後の掃除で回収される |
+| a job sits in `queued` | Is the instance listed at `/admin/workers`? Is `drain` set (a protocol_version mismatch)? |
+| `policy_rejected` comes back | The limits in `/etc/mcp-coderunner-app/config.yml`, and the paths in the Blueprint's context |
+| `image_build_failed` | The build log is at the tail of `job_results.stderr` |
+| repeated 401s | Has the token been revoked (`/admin/workers`)? Did a newline get into `/etc/mcp-coderunner-app/token`? |
+| containers pile up | `docker ps -a --filter label=mcp-coderunner-app.job`. The unit sweeps them before it starts and after it stops |

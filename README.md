@@ -1,133 +1,142 @@
 # 📋 mcp-coderunner-app
 
-任意の Dockerfile とスクリプトを受け取り、リソース制限下のコンテナで実行する MCP サーバー。
-Ractor の挙動確認やベンチマークを、手元の環境を汚さずに回すためのもの。
+An MCP server that takes a Dockerfile and a script, and runs the script in a
+resource-limited container. Built to try out Ractor behavior and run benchmarks
+without dirtying the machine I work on.
 
-- **VPS（Rails）** — 認証・認可・MCP エンドポイント・レビュー UI
-- **自宅 VM（ワーカー）** — outbound only で polling して docker を回す
+- **VPS (Rails)** — authentication, authorization, the MCP endpoint, the review UI
+- **Home VM (worker)** — polls outbound-only and drives docker
 
-自宅側に inbound の口は開けない。実行コンテナは常に `--network none`。
+Nothing listens on the home side. Job containers always run with `--network none`.
 
-設計の詳細は `.claude/plans/ruby-exec-mcp-design.md`（git 管理外）にある。
-このファイルには設計の説明を書かない。
+The design lives in `.claude/plans/ruby-exec-mcp-design.md` (not in git). This file
+does not explain the design.
 
-## 構成
+## Layout
 
 ```
-app/                 Rails: models, controllers, MCP ツール, /admin
-lib/protocol/        Rails とワーカーが共有する DTO と定数（stdlib のみ）
-worker/              docker を回す側（stdlib のみ。Rails を読まない）
-bin/worker           VM で動かす常駐プロセス
-deploy/              systemd unit と Caddyfile の例
-docs/worker-setup.md VM 側のセットアップ手順
+app/                 Rails: models, controllers, MCP tools, /admin
+lib/protocol/        DTOs and constants shared by Rails and the worker (stdlib only)
+worker/              the side that drives docker (stdlib only; never loads Rails)
+bin/worker           the long-running process on the VM
+deploy/              systemd units and an example Caddyfile
+docs/worker-setup.md how to set up the VM
 ```
 
-## 開発環境
+## Development
 
 ```sh
-bin/setup            # 依存インストール + db:prepare + 開発サーバ
-bin/dev              # web + js + worker（ワーカーのトークンは初回に自動発行される）
-bin/rails test       # Rails 側のテスト
-bin/ci               # lint・セキュリティ・テストを一通り
+bin/setup            # install dependencies, db:prepare, start the dev server
+bin/dev              # web + js + worker (the worker's token is issued on first run)
+bin/rails test       # the Rails-side tests
+bin/ci               # lint, security, and the full test suite
 
-# ワーカーは Rails を読まない。素の ruby で走らせる
+# The worker does not load Rails. Run it with plain ruby.
 ruby -Ilib -I. -e 'require "worker/runner"'
 ruby -Ilib -I. worker/test/policy_test.rb
 
-# docker を実際に回す E2E（遅い）
+# The end-to-end test that actually drives docker (slow)
 MCP_CODERUNNER_APP_E2E=1 ruby -Ilib -I. worker/test/e2e_test.rb
 ```
 
-MCP クライアントからは Streamable HTTP で `http://localhost:3000/mcp` に繋ぐ。
-アクセストークンは `/admin` でログインしたうえで発行する。
+Point an MCP client at `http://localhost:3000/mcp` over Streamable HTTP. Issue the
+access token from `/admin` after signing in.
 
-## 環境変数
+## Environment variables
 
-アプリが読むもの。
+Read by the application.
 
-| 変数 | 用途 |
+| Variable | Purpose |
 |---|---|
-| `MCP_CODERUNNER_APP_BASE_URL` | 公開 URL。review_url と OAuth のメタデータに使う |
-| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub ログイン |
-| `BOOTSTRAP_ADMIN_GITHUB_LOGIN` | 最初のログインで admin になるログイン名 |
-| `KAMAL_VERSION` | デプロイしたリビジョン。ワーカーとのずれの検知に使う |
+| `MCP_CODERUNNER_APP_BASE_URL` | Public URL. Used for `review_url` and the OAuth metadata |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub sign-in |
+| `BOOTSTRAP_ADMIN_GITHUB_LOGIN` | The login name that becomes admin on its first sign-in |
+| `KAMAL_VERSION` | The deployed revision. Used to spot drift against the worker |
 
-## 開発用ログイン
+## The developer sign-in
 
-development では `config/mcp_coderunner_app.yml` の `allow_developer_login` が true になっており、
-`/login` に「GitHub を経由せずにログイン」が出る。`dev` と入れると admin、
-ほかの名前は pending になるので、承認待ちの経路も試せる。
+In development, `allow_developer_login` in `config/mcp_coderunner_app.yml` is true,
+so `/login` offers "sign in without going through GitHub". Enter `dev` to land as an
+admin; any other name lands as pending, which is how you exercise the waiting-for-
+approval path.
 
-**認可の中心（member 以上のセッションからしか認可コードを出さない）を迂回する口なので、
-本番では絶対に true にしない。** 無効な環境では `/auth/developer` ごと生えない。
+**Never turn this on in production.** It bypasses the center of the authorization
+model, which is that an authorization code is only ever issued to a session holding
+member or above. Where the setting is off, `/auth/developer` does not exist at all.
 
-## デプロイ
+## Deployment
 
-VPS は Kamal、ワーカーは systemd（`docs/worker-setup.md`）。
+The VPS runs under Kamal; the worker runs under systemd (`docs/worker-setup.md`).
 
-イメージは**手元か CI でビルドして ghcr.io に push し、サーバーは pull するだけ**。
-VPS ではビルドしない。既存の Caddy が 80/443 を持つ前提で、kamal-proxy は無効にしてある。
+The image is **built locally or in CI and pushed to ghcr.io, and the server only
+pulls**. Nothing is built on the VPS. An existing Caddy owns 80/443, so kamal-proxy
+is disabled.
 
-**実アドレスとホスト名はリポジトリに置かない。**`config/deploy.yml` は次の環境変数から読む。
-手元から流すときはシェルに、CI からは secret に入れる。
+**The real address and hostname are not in this repository.** `config/deploy.yml`
+reads them from the environment variables below: from your shell when you deploy by
+hand, from secrets when CI does.
 
-| 変数 | 中身 |
+| Variable | Contents |
 |---|---|
-| `DEPLOY_HOST` | VPS のアドレス |
-| `MCP_CODERUNNER_APP_BASE_URL` | 公開 URL |
-| `GITHUB_CLIENT_ID` / `BOOTSTRAP_ADMIN_GITHUB_LOGIN` | GitHub ログインの設定 |
-| `KAMAL_REGISTRY_PASSWORD` | ghcr.io のトークン（`write:packages` を持つ classic PAT） |
-| `GITHUB_CLIENT_SECRET` / `RAILS_MASTER_KEY` | コンテナに渡す秘密（`.kamal/secrets` 経由） |
+| `DEPLOY_HOST` | The VPS address |
+| `MCP_CODERUNNER_APP_BASE_URL` | Public URL |
+| `GITHUB_CLIENT_ID` / `BOOTSTRAP_ADMIN_GITHUB_LOGIN` | GitHub sign-in settings |
+| `KAMAL_REGISTRY_PASSWORD` | A ghcr.io token (a classic PAT with `write:packages`) |
+| `GITHUB_CLIENT_SECRET` / `RAILS_MASTER_KEY` | Secrets handed to the container (via `.kamal/secrets`) |
 
 ```sh
-bin/kamal config     # 解決結果を確認する。デプロイ前に一度通しておくと事故が減る
+bin/kamal config     # print the resolved configuration; running this first prevents surprises
 bin/kamal deploy
 ```
 
-### CI からのデプロイ
+### Deploying from CI
 
-`main` に入って CI の全ジョブが通ると、`.github/workflows/ci.yml` の `deploy` ジョブが走る。
-VPS への ssh は [opkssh](https://github.com/openpubkey/opkssh) で、**長命の秘密鍵を CI にも VPS にも置かない**。
-GitHub Actions の OIDC トークンで入る。
+Once a change lands on `main` and every CI job passes, the `deploy` job in
+`.github/workflows/ci.yml` runs. It reaches the VPS over ssh with
+[opkssh](https://github.com/openpubkey/opkssh), so **no long-lived private key sits
+in CI or on the VPS** — it authenticates with the GitHub Actions OIDC token.
 
-ghcr.io への push と VPS からの pull には `GITHUB_TOKEN` を使う。ジョブの寿命だけ有効なので、
-**VPS に残る資格情報も同じ時間で切れる**（パッケージを public にすれば pull に資格情報は要らなくなる）。
+Pushing to ghcr.io and pulling from the VPS both use `GITHUB_TOKEN`. It is valid only
+for the lifetime of the job, so **the credentials left behind on the VPS expire on the
+same clock** (make the package public and pulling needs no credentials at all).
 
-値は GitHub の environment `production` の secret に入れる。`deploy` ジョブだけがこの
-environment を宣言しているので、ほかのジョブからは読めない。必要なら environment 側に
-承認者を設定して、デプロイを手動承認にできる。
+The values live in the secrets of the GitHub environment named `production`. Only the
+`deploy` job declares that environment, so no other job can read them. Adding a
+reviewer to the environment turns deployment into a manual approval, if you want that.
 
-必要な secret:
+The secrets it needs:
 
-| secret | 中身 |
+| Secret | Contents |
 |---|---|
-| `DEPLOY_HOST` | VPS のアドレス |
-| `DEPLOY_SSH_USER` | ssh の接続先ユーザー（未設定なら `root`） |
-| `MCP_CODERUNNER_APP_BASE_URL` | 公開 URL |
-| `OAUTH_GITHUB_CLIENT_ID` / `OAUTH_GITHUB_CLIENT_SECRET` | GitHub ログイン。**`GITHUB_` で始まる名前の secret は作れない**ので別名で置き、ワークフローで移し替える |
-| `BOOTSTRAP_ADMIN_GITHUB_LOGIN` | 最初のログインで admin になるログイン名 |
-| `RAILS_MASTER_KEY` | `config/master.key` の中身 |
+| `DEPLOY_HOST` | The VPS address |
+| `DEPLOY_SSH_USER` | The ssh user to log in as (defaults to `root`) |
+| `MCP_CODERUNNER_APP_BASE_URL` | Public URL |
+| `OAUTH_GITHUB_CLIENT_ID` / `OAUTH_GITHUB_CLIENT_SECRET` | GitHub sign-in. **A secret's name cannot start with `GITHUB_`**, so they are stored under another name and copied across in the workflow |
+| `BOOTSTRAP_ADMIN_GITHUB_LOGIN` | The login name that becomes admin on its first sign-in |
+| `RAILS_MASTER_KEY` | The contents of `config/master.key` |
 
-VPS 側は opkssh を入れて、GitHub Actions を発行者として許可する。
+On the VPS, install opkssh and allow GitHub Actions as an issuer.
 
 ```
 # /etc/opk/providers
 https://token.actions.githubusercontent.com github oidc
 
-# /etc/opk/auth_id  （<ログインさせる Linux ユーザー> <主体> <発行者>）
+# /etc/opk/auth_id  (<the Linux user to log in as> <principal> <issuer>)
 root repo:unasuke/mcp-coderunner-app:environment:production https://token.actions.githubusercontent.com
 ```
 
-**主体は environment で書く。**ジョブが environment を宣言すると、OIDC トークンの `sub` は
-`...:ref:refs/heads/main` ではなく `...:environment:production` になる。ブランチ名で書くと弾かれる。
+**Write the principal in terms of the environment.** When a job declares an
+environment, the `sub` of its OIDC token becomes `...:environment:production` rather
+than `...:ref:refs/heads/main`. Written as a branch, it is rejected.
 
-この 1 行が、`main` の `deploy` ジョブ以外を入れないための唯一の関門になる。
-ブランチやフォークの CI は environment を宣言できないので主体が一致しない。
+That single line is the only gate keeping everything but the `deploy` job on `main`
+out: CI on a branch or a fork cannot declare the environment, so its principal will
+never match.
 
-リポジトリを public にしたらパッケージも public にしてよい。イメージの中身は
-公開済みのソースなので隠す意味がなく、public にすればサーバー側は資格情報なしで
-pull できる。
+Once the repository is public the package can be public too. The image holds nothing
+but published source, so there is nothing to hide, and a public package lets the
+server pull without credentials.
 
-## ライセンス
+## License
 
-MIT License（[LICENSE](LICENSE)）
+MIT License ([LICENSE](LICENSE))
