@@ -22,12 +22,17 @@ module Api
         private
 
         # 同じ worker_id の古い行があれば、その場で死んだものとして片付ける。
-        # 後述の掃除を待たない。再起動直後にジョブが宙吊りのまま残るのを避けるため
+        # 後述の掃除を待たない。再起動直後にジョブが宙吊りのまま残るのを避けるため。
+        #
+        # ここは異常終了の受け皿なので expired として数える。正常停止なら
+        # /deregister が先に通っていて、そちらは試行回数を見ずに queued へ戻す。
+        # requeue_always にすると、Restart=always のクラッシュループが同じジョブを
+        # 無限に拾い続ける（/deregister は呼ばれないので回数が増えない）
         def reap_previous_processes
           WorkerProcess.where(worker_id: current_worker.worker_id, stopped_at: nil)
             .where.not(instance_id: params[:instance_id]).find_each do |process|
             Lease.active.held_by(process.instance_id).find_each do |lease|
-              Jobs::ReleaseLease.call(lease:, reason: "deregistered", requeue_always: true)
+              Jobs::ReleaseLease.call(lease:, reason: "expired")
             end
             process.stop!
           end

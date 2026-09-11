@@ -137,6 +137,46 @@ class WorkerApiTest < ActionDispatch::IntegrationTest
     assert_predicate WorkerProcess.find_by(instance_id: INSTANCE_ID).stopped_at, :present?
   end
 
+  # クラッシュした側は /deregister を打てない。register での片付けは異常終了の
+  # 受け皿なので、試行回数を消費させないと無限に拾い続ける
+  test "re-registering after a crash counts the attempt" do
+    register!
+    post "/api/worker/v1/lease", headers: auth_headers, as: :json,
+      params: { instance_id: INSTANCE_ID, protocol_version: Protocol::Constants::PROTOCOL_VERSION }
+
+    assert_equal "leased", @job.reload.state
+
+    post "/api/worker/v1/register", headers: auth_headers, as: :json, params: {
+      worker_id: @worker.worker_id, instance_id: "#{INSTANCE_ID}-2", commit_hash: "abc123",
+      protocol_version: Protocol::Constants::PROTOCOL_VERSION, capacity: 2
+    }
+
+    assert_response :success
+    assert_equal "queued", @job.reload.state
+    assert_equal "expired", @job.leases.order(:id).last.release_reason
+    assert_equal 1, @job.leases.count
+  end
+
+  test "a crash loop gives up at the attempt limit" do
+    Protocol::Constants::MAX_ATTEMPTS.times do |i|
+      instance = "#{INSTANCE_ID}-#{i}"
+      post "/api/worker/v1/register", headers: auth_headers, as: :json, params: {
+        worker_id: @worker.worker_id, instance_id: instance, commit_hash: "abc123",
+        protocol_version: Protocol::Constants::PROTOCOL_VERSION, capacity: 2
+      }
+      post "/api/worker/v1/lease", headers: auth_headers, as: :json,
+        params: { instance_id: instance, protocol_version: Protocol::Constants::PROTOCOL_VERSION }
+    end
+
+    post "/api/worker/v1/register", headers: auth_headers, as: :json, params: {
+      worker_id: @worker.worker_id, instance_id: "#{INSTANCE_ID}-last", commit_hash: "abc123",
+      protocol_version: Protocol::Constants::PROTOCOL_VERSION, capacity: 2
+    }
+
+    assert_equal "finished", @job.reload.state
+    assert_equal "lease_expired", @job.job_result.termination_reason
+  end
+
   test "deregister is idempotent for unknown instances" do
     register!
 
