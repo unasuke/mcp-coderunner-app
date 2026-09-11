@@ -43,6 +43,8 @@ MCP クライアントからは Streamable HTTP で `http://localhost:3000/mcp` 
 
 ## 環境変数
 
+アプリが読むもの。
+
 | 変数 | 用途 |
 |---|---|
 | `MCP_CODERUNNER_APP_BASE_URL` | 公開 URL。review_url と OAuth のメタデータに使う |
@@ -61,8 +63,30 @@ development では `config/mcp_coderunner_app.yml` の `allow_developer_login` �
 
 ## デプロイ
 
-VPS は Kamal、ワーカーは systemd。`docs/worker-setup.md` を参照。
-既存の Caddy が 80/443 を持つ前提で、Kamal 側の proxy は無効にしてある。
+VPS は Kamal、ワーカーは systemd（`docs/worker-setup.md`）。
+
+イメージは**手元か CI でビルドして ghcr.io に push し、サーバーは pull するだけ**。
+VPS ではビルドしない。既存の Caddy が 80/443 を持つ前提で、kamal-proxy は無効にしてある。
+
+**実アドレスとホスト名はリポジトリに置かない。**`config/deploy.yml` は次の環境変数から読む。
+手元から流すときはシェルに、CI からは secret に入れる。
+
+| 変数 | 中身 |
+|---|---|
+| `DEPLOY_HOST` | VPS のアドレス |
+| `MCP_CODERUNNER_APP_BASE_URL` | 公開 URL |
+| `GITHUB_CLIENT_ID` / `BOOTSTRAP_ADMIN_GITHUB_LOGIN` | GitHub ログインの設定 |
+| `KAMAL_REGISTRY_PASSWORD` | ghcr.io のトークン（`write:packages` を持つ classic PAT） |
+| `GITHUB_CLIENT_SECRET` / `RAILS_MASTER_KEY` | コンテナに渡す秘密（`.kamal/secrets` 経由） |
+
+```sh
+bin/kamal config     # 解決結果を確認する。デプロイ前に一度通しておくと事故が減る
+bin/kamal deploy
+```
+
+リポジトリを public にしたらパッケージも public にしてよい。イメージの中身は
+公開済みのソースなので隠す意味がなく、public にすればサーバー側は資格情報なしで
+pull できる。
 
 ## ライセンス
 

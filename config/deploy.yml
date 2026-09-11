@@ -1,14 +1,18 @@
 # Name of your application. Used to uniquely configure containers.
 service: mcp_coderunner_app
 
-# Name of the container image (use your-user/app-name on external registries).
-image: mcp_coderunner_app
+# Name of the container image. ghcr.io requires the owner in the name.
+image: unasuke/mcp-coderunner-app
 
 # Deploy to these servers.
+# 実アドレスはリポジトリに置かない。CI では secret から渡す。
 servers:
   web:
     hosts:
-      - 192.168.0.1
+      - <%= ENV.fetch("DEPLOY_HOST") %>
+    # 既存の Caddy が 80/443 を持っているので kamal-proxy は使わない。
+    # 無効化はロール側で指定する（トップレベルの proxy: はプロキシ自身の設定）
+    proxy: false
     options:
       publish: [ "127.0.0.1:3000:80" ]
   # job:
@@ -16,22 +20,17 @@ servers:
   #     - 192.168.0.1
   #   cmd: bin/jobs
 
-# 既存の Caddy が 80/443 を持っているので Kamal 側の proxy は使わない。
-# コンテナを localhost の固定ポートに publish して、Caddy から reverse_proxy localhost:3000 で拾う。
-# 証明書も Caddy の自動 HTTPS に任せる（deploy/Caddyfile.example）。
-proxy: false
+# コンテナは localhost の固定ポートに publish し、Caddy から
+# reverse_proxy localhost:3000 で拾う。証明書も Caddy の自動 HTTPS に任せる
+# （deploy/Caddyfile.example）。
 
-# Where you keep your container images.
+# イメージは手元か CI でビルドして push し、サーバーは pull するだけ。
+# VPS ではビルドしない。
 registry:
-  # Alternatives: hub.docker.com / registry.digitalocean.com / ghcr.io / ...
-  server: localhost:5555
-
-  # Needed for authenticated registries.
-  # username: your-user
-
-  # Always use an access token rather than real password when possible.
-  # password:
-  #   - KAMAL_REGISTRY_PASSWORD
+  server: ghcr.io
+  username: unasuke
+  password:
+    - KAMAL_REGISTRY_PASSWORD
 
 # Inject ENV variables into containers (secrets come from .kamal/secrets).
 env:
@@ -39,14 +38,10 @@ env:
     - RAILS_MASTER_KEY
     - GITHUB_CLIENT_SECRET
   clear:
-    # review_url と OAuth のメタデータに使う公開 URL
-    MCP_CODERUNNER_APP_BASE_URL: https://mcp-coderunner-app.example.com
-
-    # GitHub ログイン。read:user だけ要求する
-    GITHUB_CLIENT_ID: ""
-
-    # 最初のログインで admin になる GitHub のログイン名
-    BOOTSTRAP_ADMIN_GITHUB_LOGIN: ""
+    # ホスト名とログイン名もリポジトリに置かない。CI では secret から渡す
+    MCP_CODERUNNER_APP_BASE_URL: <%= ENV.fetch("MCP_CODERUNNER_APP_BASE_URL") %>
+    GITHUB_CLIENT_ID: <%= ENV.fetch("GITHUB_CLIENT_ID") %>
+    BOOTSTRAP_ADMIN_GITHUB_LOGIN: <%= ENV.fetch("BOOTSTRAP_ADMIN_GITHUB_LOGIN") %>
 
     # ワーカーが 25 秒のロングポーリングでスレッドを 1 本占有する。
     # 「ワーカーのインスタンス数 + ブラウザと MCP の分」を確保する
