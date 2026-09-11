@@ -42,9 +42,14 @@ sudo chown root:root /etc/mcp-coderunner-app/token
 | 経路 | ポリシー |
 |---|---|
 | コンテナ用ブリッジ → インターネット | 許可（build フェーズに必要） |
-| コンテナ用ブリッジ → LAN | 全拒否 |
-| VM 自身の outbound | VPS のエンドポイントのみ許可 |
+| **コンテナ用ブリッジ → LAN** | **全拒否（ここだけは落とせない）** |
+| VM 自身の outbound | 制限しない |
 | inbound | 全拒否 |
+
+VM 自身の outbound を絞らないのは、**build フェーズに外向きの通信路がある時点で
+出口は既に開いているから**（設計 §9.2 で受け入れている）。VM 本体だけを塞いでも、
+守れるものの割に更新や運用の手数が増える。守っているのは LAN への到達と inbound で、
+そこは変えない。
 
 nftables なら、docker のブリッジ（既定では `docker0`、`172.17.0.0/16`）から
 RFC1918 のアドレスへ出る通信を落とす。
@@ -94,11 +99,19 @@ ruby -Ilib -I. -e 'require "worker/runner"'
 ## 更新する
 
 ```sh
-cd /opt/mcp-coderunner-app
-sudo git pull
-sudo git rev-parse HEAD | sudo tee REVISION
-sudo systemctl restart mcp-coderunner-app-worker
+sudo /opt/mcp-coderunner-app/deploy/update-worker.sh
 ```
+
+`origin/main` に合わせて、`REVISION` を書き直し、unit を再起動する。
+`git pull` ではなく `git reset --hard` なので、手元に差分が残っていても結果が一意になる。
+`bundle install` は要らない（ワーカーは stdlib だけで書かれている）。
+
+**引き金は人間か VM 側の timer が引く。VPS には引かせない。** heartbeat の `outdated` を見て
+自動更新する形にすると、VPS が VM で動くコードを決められることになり、
+「ワーカーは VPS を信用しない」という土台が崩れる。
+
+戻すときは同じ手順で、`git reset --hard <SHA>` を指すようにする。ビルド成果物が無いので
+チェックアウトを戻して再起動するだけで済む。
 
 再起動時はワーカーが `/deregister` を打つので、走りかけのジョブは即座にキューへ戻る。
 リースのタイムアウトも heartbeat の失効判定も待たない。
