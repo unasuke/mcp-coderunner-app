@@ -15,11 +15,22 @@ module Jobs
       end
     end
 
-    # bench は排他。サーバーとワーカーの両方で持つ（VPS の状態がずれても 2 本同時に走らせない）
+    # bench は排他。サーバーとワーカーの両方で持つ（VPS の状態がずれても 2 本同時に走らせない）。
+    #
+    #   - bench が走っているあいだは何も渡さない
+    #   - ほかのジョブが走っているあいだは bench を渡さない
+    #
+    # 測定値が壊れても結果を見ただけでは分からないので、ここは厳しく直列にする。
     def self.next_claimable
-      scope = Job.claimable
-      scope = scope.where.not(profile: exclusive_profiles) if exclusive_running?
+      return nil if exclusive_running?
+
+      scope = Job.claimable.where(cancel_requested_at: nil)
+      scope = scope.where.not(profile: exclusive_profiles) if running?
       scope.first
+    end
+
+    def self.running?
+      Job.where(state: [ :leased, :running ]).exists?
     end
 
     def self.exclusive_profiles
