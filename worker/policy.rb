@@ -77,14 +77,16 @@ module Worker
     def cache_ttl_days = build.fetch("cache_ttl_days")
     def max_images = build.fetch("max_images")
 
-    # VPS から来た要求値を上限として解釈し、自分の設定を超えていたら切り詰める
+    # VPS から来た要求値を上限として解釈し、自分の設定を超えていたら切り詰める。
+    # 切り詰めるのは上だけで、下は切り詰めずに拒否する。--pids-limit -1 は
+    # Docker が「無制限」と解釈するので、負数を黙って通すと制限が消える
     def clamp(requested)
       {
-        memory_mb: clamp_value(requested[:memory_mb], "max_memory_mb"),
-        cpus: clamp_value(requested[:cpus], "max_cpus"),
-        pids: clamp_value(requested[:pids], "max_pids"),
-        timeout_s: clamp_value(requested[:timeout_s], "max_timeout_s"),
-        tmpfs_mb: clamp_value(requested[:tmpfs_mb], "max_tmpfs_mb")
+        memory_mb: clamp_integer(requested[:memory_mb], "max_memory_mb"),
+        cpus: clamp_number(requested[:cpus], "max_cpus"),
+        pids: clamp_integer(requested[:pids], "max_pids"),
+        timeout_s: clamp_integer(requested[:timeout_s], "max_timeout_s"),
+        tmpfs_mb: clamp_integer(requested[:tmpfs_mb], "max_tmpfs_mb")
       }
     end
 
@@ -121,11 +123,36 @@ module Worker
 
     private
 
-    def clamp_value(requested, key)
+    # docker に整数で渡すもの。1 未満は拒否する
+    def clamp_integer(requested, key)
       max = limits.fetch(key)
       return max if requested.nil?
 
-      [ requested, max ].min
+      value = numeric(requested, key).to_i
+      raise PolicyRejected, "#{key.sub("max_", "")} must be positive: #{requested.inspect}" unless value.positive?
+
+      [ value, max ].min
+    end
+
+    # cpus は小数を許す。プロファイルは整数だが、入力の形を狭めすぎない
+    def clamp_number(requested, key)
+      max = limits.fetch(key)
+      return max if requested.nil?
+
+      value = numeric(requested, key)
+      raise PolicyRejected, "#{key.sub("max_", "")} must be positive: #{requested.inspect}" unless value.positive?
+
+      [ value, max ].min
+    end
+
+    def numeric(value, key)
+      case value
+      when Numeric then value
+      when String then Float(value)
+      else raise PolicyRejected, "#{key.sub("max_", "")} is not a number: #{value.inspect}"
+      end
+    rescue ArgumentError, TypeError
+      raise PolicyRejected, "#{key.sub("max_", "")} is not a number: #{value.inspect}"
     end
   end
 end

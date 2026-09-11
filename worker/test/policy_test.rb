@@ -24,6 +24,26 @@ class PolicyTest < Minitest::Test
     assert_equal({ memory_mb: 512, cpus: 1, pids: 128, timeout_s: 30, tmpfs_mb: 64 }, applied)
   end
 
+  # --pids-limit -1 は Docker が「無制限」と解釈する。黙って通すと制限が消える
+  def test_rejects_values_at_or_below_zero
+    assert_raises(Worker::PolicyRejected) { @policy.clamp({ pids: -1 }) }
+    assert_raises(Worker::PolicyRejected) { @policy.clamp({ memory_mb: 0 }) }
+    assert_raises(Worker::PolicyRejected) { @policy.clamp({ timeout_s: -5 }) }
+    assert_raises(Worker::PolicyRejected) { @policy.clamp({ cpus: 0 }) }
+    assert_raises(Worker::PolicyRejected) { @policy.clamp({ tmpfs_mb: 0.4 }) }
+  end
+
+  def test_rejects_values_that_are_not_numbers
+    assert_raises(Worker::PolicyRejected) { @policy.clamp({ memory_mb: "たくさん" }) }
+    assert_raises(Worker::PolicyRejected) { @policy.clamp({ pids: [ 512 ] }) }
+  end
+
+  # プロファイルは整数だが、入力の形は狭めすぎない
+  def test_keeps_fractional_cpus
+    assert_in_delta 1.5, @policy.clamp({ cpus: 1.5 }).fetch(:cpus)
+    assert_equal 2, @policy.clamp({ cpus: "4" }).fetch(:cpus)
+  end
+
   def test_missing_values_fall_back_to_the_local_maximum
     applied = @policy.clamp({})
 
