@@ -92,6 +92,11 @@ module Worker
         "--name", container,
         "--label", "#{Protocol::Constants::CONTAINER_LABEL}=#{payload.job_id}",
         "--network", "none",
+        # 承認済み Blueprint 上の script はレビューされない。出力し続けるだけで
+        # ホストのディスクを埋められるので、docker 側でも上限を持つ
+        "--log-driver", "json-file",
+        "--log-opt", "max-size=#{log_max_size}",
+        "--log-opt", "max-file=2",
         "--memory", memory,
         "--memory-swap", memory,
         "--cpus", applied.fetch(:cpus).to_s,
@@ -113,6 +118,12 @@ module Worker
     end
 
     private
+
+    # docker の max-size は k / m / g の接尾辞しか受け付けない
+    def log_max_size
+      kilobytes = (@policy.max_output_bytes / 1024.0).ceil
+      "#{[ kilobytes, 1 ].max}k"
+    end
 
     def prepare_workdir(payload)
       workdir = File.join(job_dir(payload), "work")

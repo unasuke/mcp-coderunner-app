@@ -32,6 +32,16 @@ class RunnerTest < Minitest::Test
     assert_equal "core=0", pair(list, "--ulimit")
   end
 
+  # 承認済み Blueprint 上の script はレビューされない。出力でホストのディスクを
+  # 埋められないように docker 側にも上限を置く
+  def test_limits_the_container_log
+    list = args
+
+    assert_equal "json-file", pair(list, "--log-driver")
+    assert_includes list, "max-size=256k"
+    assert_includes list, "max-file=2"
+  end
+
   # --rm を付けると終了と同時にコンテナが消えて State.OOMKilled を読めない
   def test_does_not_remove_the_container_automatically
     refute_includes args, "--rm"
