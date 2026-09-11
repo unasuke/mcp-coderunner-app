@@ -9,7 +9,7 @@ CI.run do
   step "Style: Templates", "bundle exec herb lint \"app/views/**/*.html.erb\""
 
   step "Security: Gem audit", "bin/bundler-audit"
-  step "Security: Yarn vulnerability audit", "yarn audit"
+  step "Security: Yarn vulnerability audit", "yarn npm audit"
   step "Security: Brakeman code analysis", "bin/brakeman --quiet --no-pager --exit-on-warn --exit-on-error"
   step "Worker: loads under plain ruby", "ruby -Ilib -I. -e 'require \"worker/runner\"'"
   step "Tests: Worker", "ruby -Ilib -I. -e 'Dir[\"worker/test/*_test.rb\"].each { |f| require File.expand_path(f) }'"

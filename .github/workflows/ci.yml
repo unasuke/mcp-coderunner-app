@@ -5,6 +5,12 @@ on:
   push:
     branches: [ main ]
 
+# corepack reads the yarn version out of package.json's packageManager and
+# fetches it on first use. Without this it stops to ask, and a job with no one
+# to answer hangs
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+
 jobs:
   scan_ruby:
     runs-on: ubuntu-latest
@@ -52,7 +58,9 @@ jobs:
 
       # herb lint runs the linter from node_modules, pinned there and in .herb.yml
       - name: Install JavaScript dependencies
-        run: yarn install --frozen-lockfile
+        run: |
+          corepack enable
+          yarn install --immutable
 
       # HTML-aware, so it sees what RuboCop cannot: unclosed tags, output in
       # attribute position, branches that repeat the same element
@@ -108,6 +116,11 @@ jobs:
         with:
           bundler-cache: true
 
+      # The tests build the JavaScript through jsbundling, which shells out to
+      # yarn. The runner ships Yarn 1, which cannot read a Yarn 4 lockfile
+      - name: Enable corepack
+        run: corepack enable
+
       - name: Run tests
         env:
           RAILS_ENV: test
@@ -135,6 +148,9 @@ jobs:
         uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
         with:
           bundler-cache: true
+
+      - name: Enable corepack
+        run: corepack enable
 
       - name: Run System Tests
         env:

@@ -39,6 +39,12 @@
 
 /node_modules
 
+# Yarn 4 keeps its state here. The version itself comes from packageManager in
+# package.json by way of corepack, so there is no release binary to carry.
+/.yarn/*
+!/.yarn/patches
+.pnp.*
+
 # rails new's Dockerfile does COPY vendor/* , so the directory has to exist in a
 # fresh checkout -- and Kamal builds from a clone of HEAD, not the working tree.
 # Un-ignore it here in case a global ignore covers /vendor/, and keep the bundle out.
