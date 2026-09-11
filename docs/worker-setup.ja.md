@@ -104,6 +104,35 @@ printf 'DOCKER_HOST=unix:///run/user/%s/docker.sock\n' "$uid" \
 sudo systemctl disable --now docker.service docker.socket
 ```
 
+### build フェーズの DNS
+
+ホストは systemd-resolved で名前を引いており、そのスタブは `127.0.0.53` にいる。
+コンテナは自分のネットワーク名前空間と自分の loopback を持つので、**そこには誰もいない**。
+build の DNS クエリは出ていったまま返らず、`apt-get update` がソースごとに 20 秒ずつ
+リトライして数分後に失敗する。daemon が渡せる有効なリゾルバが存在しないので、明示する。
+
+```sh
+uid=$(id -u mcp-coderunner-app)
+
+sudo -u mcp-coderunner-app install -d /var/lib/mcp-coderunner-app/.config/docker
+sudo -u mcp-coderunner-app tee /var/lib/mcp-coderunner-app/.config/docker/daemon.json > /dev/null <<'JSON'
+{ "dns": ["1.1.1.1", "8.8.8.8"] }
+JSON
+
+sudo -u mcp-coderunner-app env XDG_RUNTIME_DIR=/run/user/$uid systemctl --user restart docker
+```
+
+これは rootless の daemon の設定。`/etc/docker/daemon.json` は rootful 用で、いまは何もしない。
+
+```sh
+printf 'FROM alpine\nRUN cat /etc/resolv.conf && nslookup deb.debian.org\n' > /tmp/df
+sudo -u mcp-coderunner-app env DOCKER_HOST=unix:///run/user/$uid/docker.sock \
+  docker build --no-cache --progress=plain -f /tmp/df /tmp 2>&1 | tail -20
+```
+
+`--progress=plain` が要る。付けないと `RUN` の出力が表示されない。実行コンテナには
+この設定は関係ない（`--network none`）。名前を引くのは build フェーズだけ。
+
 ### rootful から移行する場合
 
 rootful のワーカーを動かしていた VM では**アカウントが既にあるので、上の `useradd` は
@@ -240,6 +269,7 @@ sudo /opt/mcp-coderunner-app/deploy/update-worker.sh
 |---|---|
 | ジョブが `queued` のまま動かない | `/admin/workers` にインスタンスが出ているか。`drain` が立っていないか（protocol_version のずれ） |
 | `policy_rejected` が返る | `/etc/mcp-coderunner-app/config.yml` の上限と、Blueprint の context のパス |
+| build が固まった末に `apt-get update` で失敗する | DNS。ホストの `127.0.0.53` にコンテナからは届かない。「build フェーズの DNS」を見る |
 | `image_build_failed` | `job_results.stderr` の末尾にビルドログが入っている |
 | 401 が続く | トークンが失効していないか（`/admin/workers`）。`/etc/mcp-coderunner-app/token` の中身に改行が混ざっていないか |
 | ビルドが `unknown flag: --tag` で落ちる | docker CLI がプラグインディレクトリを見失っている。Docker 29 では `build` は buildx プラグインが提供する。`ProtectHome=yes` によって `$HOME/.docker` が「無い」ではなく「読めない」になるのが原因で、CLI はこの 2 つを区別する。unit の `DOCKER_CONFIG` で回避しているので、古い unit のままなら置き直す |

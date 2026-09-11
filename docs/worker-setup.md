@@ -110,6 +110,38 @@ printf 'DOCKER_HOST=unix:///run/user/%s/docker.sock\n' "$uid" \
 sudo systemctl disable --now docker.service docker.socket
 ```
 
+### DNS for the build phase
+
+The host resolves through systemd-resolved, whose stub listens on `127.0.0.53`. A
+container has its own network namespace and its own loopback, where nothing is
+listening, so a build's DNS queries leave and never come back: `apt-get update`
+retries each source for twenty seconds at a time and gives up minutes later. The
+daemon has no resolver worth passing on, so give it one.
+
+```sh
+uid=$(id -u mcp-coderunner-app)
+
+sudo -u mcp-coderunner-app install -d /var/lib/mcp-coderunner-app/.config/docker
+sudo -u mcp-coderunner-app tee /var/lib/mcp-coderunner-app/.config/docker/daemon.json > /dev/null <<'JSON'
+{ "dns": ["1.1.1.1", "8.8.8.8"] }
+JSON
+
+sudo -u mcp-coderunner-app env XDG_RUNTIME_DIR=/run/user/$uid systemctl --user restart docker
+```
+
+That is the rootless daemon's configuration. `/etc/docker/daemon.json` belongs to the
+rootful one and does nothing now.
+
+```sh
+printf 'FROM alpine\nRUN cat /etc/resolv.conf && nslookup deb.debian.org\n' > /tmp/df
+sudo -u mcp-coderunner-app env DOCKER_HOST=unix:///run/user/$uid/docker.sock \
+  docker build --no-cache --progress=plain -f /tmp/df /tmp 2>&1 | tail -20
+```
+
+`--progress=plain` matters: without it the output of a `RUN` is not printed. Job
+containers never need any of this — they run with `--network none`. Only the build
+phase resolves anything.
+
 ### Coming from the rootful setup
 
 On a VM that already ran the rootful worker, the account exists and `useradd` above
@@ -256,6 +288,7 @@ expire.
 |---|---|
 | a job sits in `queued` | Is the instance listed at `/admin/workers`? Is `drain` set (a protocol_version mismatch)? |
 | `policy_rejected` comes back | The limits in `/etc/mcp-coderunner-app/config.yml`, and the paths in the Blueprint's context |
+| a build hangs, then fails on `apt-get update` | DNS. The container cannot reach the host's `127.0.0.53`; see "DNS for the build phase" |
 | `image_build_failed` | The build log is at the tail of `job_results.stderr` |
 | repeated 401s | Has the token been revoked (`/admin/workers`)? Did a newline get into `/etc/mcp-coderunner-app/token`? |
 | `unknown flag: --tag` from a build | The docker CLI lost its plugin directory, and `build` is the buildx plugin. `ProtectHome=yes` turns the service's `$HOME/.docker` from missing into unreadable, which is what the CLI cannot take. The unit sets `DOCKER_CONFIG` for this; a unit older than that needs recopying |
