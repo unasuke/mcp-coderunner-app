@@ -127,12 +127,29 @@ On the VPS, install opkssh and allow GitHub Actions as an issuer.
 https://token.actions.githubusercontent.com github oidc
 
 # /etc/opk/auth_id  (<the Linux user to log in as> <principal> <issuer>)
-root repo:unasuke/mcp-coderunner-app:environment:production https://token.actions.githubusercontent.com
+root repo:unasuke@4487291/mcp-coderunner-app@1365649101:environment:production https://token.actions.githubusercontent.com
 ```
 
-**Write the principal in terms of the environment.** When a job declares an
-environment, the `sub` of its OIDC token becomes `...:environment:production` rather
-than `...:ref:refs/heads/main`. Written as a branch, it is rejected.
+(`~/.opk/auth_id`, owned by that user and mode 600, works the same and needs no root.)
+
+**The principal is the `sub` of the OIDC token, exactly.** Two things shape it, and
+both are easy to get wrong:
+
+- **Write it in terms of the environment.** A job that declares one gets
+  `...:environment:production`, not `...:ref:refs/heads/main`. Written as a branch,
+  it is rejected.
+- **The ids belong in it.** Since 2026-07-15 GitHub puts immutable ids in the
+  subject -- `owner@<owner id>/repo@<repo id>` -- for every repository created,
+  renamed, or transferred from that date on. Without them a name that someone else
+  later takes over would present the same subject. Read the ids with:
+
+  ```sh
+  gh api repos/OWNER/REPO --jq '"\(.owner.login)@\(.owner.id)/\(.name)@\(.id)"'
+  ```
+
+  An older repository that has not been renamed still uses the plain names. If
+  `/var/log/opkssh.log` on the server says `no policy to allow ... to assume <user>`,
+  the subject and the policy line disagree; that log names the issuer it saw.
 
 That single line is the only gate keeping everything but the `deploy` job on `main`
 out: CI on a branch or a fork cannot declare the environment, so its principal will
