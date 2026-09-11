@@ -128,4 +128,5 @@ sudo /opt/mcp-coderunner-app/deploy/update-worker.sh
 | `policy_rejected` が返る | `/etc/mcp-coderunner-app/config.yml` の上限と、Blueprint の context のパス |
 | `image_build_failed` | `job_results.stderr` の末尾にビルドログが入っている |
 | 401 が続く | トークンが失効していないか（`/admin/workers`）。`/etc/mcp-coderunner-app/token` の中身に改行が混ざっていないか |
+| ビルドが `unknown flag: --tag` で落ちる | docker CLI がプラグインディレクトリを見失っている。Docker 29 では `build` は buildx プラグインが提供する。`ProtectHome=yes` によって `$HOME/.docker` が「無い」ではなく「読めない」になるのが原因で、CLI はこの 2 つを区別する。unit の `DOCKER_CONFIG` で回避しているので、古い unit のままなら置き直す |
 | コンテナが残る | `docker ps -a --filter label=mcp-coderunner-app.job`。unit の起動前・停止後の掃除で回収される |

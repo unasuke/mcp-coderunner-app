@@ -137,4 +137,5 @@ expire.
 | `policy_rejected` comes back | The limits in `/etc/mcp-coderunner-app/config.yml`, and the paths in the Blueprint's context |
 | `image_build_failed` | The build log is at the tail of `job_results.stderr` |
 | repeated 401s | Has the token been revoked (`/admin/workers`)? Did a newline get into `/etc/mcp-coderunner-app/token`? |
+| `unknown flag: --tag` from a build | The docker CLI lost its plugin directory, and `build` is the buildx plugin. `ProtectHome=yes` turns the service's `$HOME/.docker` from missing into unreadable, which is what the CLI cannot take. The unit sets `DOCKER_CONFIG` for this; a unit older than that needs recopying |
 | containers pile up | `docker ps -a --filter label=mcp-coderunner-app.job`. The unit sweeps them before it starts and after it stops |

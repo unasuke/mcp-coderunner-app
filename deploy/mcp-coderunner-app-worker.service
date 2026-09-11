@@ -14,6 +14,14 @@ ExecStart=/usr/bin/ruby /opt/mcp-coderunner-app/bin/worker --config /etc/mcp-cod
 # The token is not in the environment. It shows up in neither /proc/PID/environ nor systemctl show
 LoadCredential=api_token:/etc/mcp-coderunner-app/token
 
+# ProtectHome below makes /home inaccessible, so the docker CLI's read of
+# $HOME/.docker comes back as permission denied rather than not found -- and the
+# two are not the same to it. A missing directory it ignores; an unreadable one
+# costs it the user plugin directory, and with it `build`, which in Docker 29 is
+# the buildx plugin. `docker build --tag` then fails as an unknown top-level flag.
+# Point it somewhere the service can actually reach.
+Environment=DOCKER_CONFIG=%t/mcp-coderunner-app/.docker
+
 # An unclean exit leaves job containers behind. They are collected by label.
 # systemd does not do command substitution, hence the sh
 ExecStartPre=-/bin/sh -c 'docker ps -aq --filter label=mcp-coderunner-app.job | xargs -r docker rm --force --volumes'
