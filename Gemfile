@@ -21,7 +21,7 @@ gem "jbuilder"
 # 8.1.3.1 still calls JSON.parse(json, options) in ::JSON.decode. Left on the 3.0.2
 # that ships with Ruby 4.0, no JSON request body parses at all -- /mcp and the worker
 # API both answer 500
-gem "json", "~> 2.9"
+gem "json", "~> 3.0"
 
 # MCP server implementation [https://github.com/modelcontextprotocol/ruby-sdk]
 gem "mcp"
