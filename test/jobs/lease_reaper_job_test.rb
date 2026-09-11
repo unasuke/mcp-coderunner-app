@@ -12,7 +12,7 @@ class LeaseReaperJobTest < ActiveSupport::TestCase
       capacity: 2, started_at: Time.current, last_heartbeat_at:)
   end
 
-  # ワーカーがクラッシュしたときにリースのタイムアウトを待たずに済む
+  # Saves waiting out a lease timeout when a worker crashes
   test "a stale process loses its leases immediately" do
     register_process(instance_id: "dead", last_heartbeat_at: 5.minutes.ago)
     lease, = Lease.issue!(job: @job, instance_id: "dead")
@@ -45,7 +45,7 @@ class LeaseReaperJobTest < ActiveSupport::TestCase
     assert_equal "expired", lease.reload.release_reason
   end
 
-  # 中断を要求したジョブを queued に戻すと、止めたはずのものが走り直す
+  # Requeuing a job someone asked to stop would start the stopped thing over again
   test "a cancelled job is finished rather than requeued" do
     register_process(instance_id: "alive")
     lease, = Lease.issue!(job: @job, instance_id: "alive")
@@ -71,7 +71,7 @@ class LeaseReaperJobTest < ActiveSupport::TestCase
     assert_equal "expired", lease.reload.release_reason
   end
 
-  # reaper と /deregister が同じリースに同時に来ても二重に動かさない
+  # The reaper and /deregister arriving at the same lease together still act once
   test "releasing an already released lease is a no-op" do
     register_process(instance_id: "alive")
     lease, = Lease.issue!(job: @job, instance_id: "alive")
@@ -83,7 +83,7 @@ class LeaseReaperJobTest < ActiveSupport::TestCase
     assert_equal "leased", @job.reload.state
   end
 
-  # 再試行の上限は「何が起きたか」ではなく「何回試したか」で持つ
+  # The retry ceiling is counted in attempts made, not in what went wrong
   test "the job gives up after the attempt limit" do
     register_process(instance_id: "alive")
     Protocol::Constants::MAX_ATTEMPTS.times do

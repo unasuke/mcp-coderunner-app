@@ -21,7 +21,8 @@ module McpCoderunnerApp
     # These settings can be overridden in specific environments using the files
     # in config/environments, which are processed later.
     #
-    # 設定値は config/mcp_coderunner_app.yml に置き、Rails.configuration.x.mcp_coderunner_app から読む
+    # Settings live in config/mcp_coderunner_app.yml and are read from
+    # Rails.configuration.x.mcp_coderunner_app
     config.x.mcp_coderunner_app = config_for(:mcp_coderunner_app)
 
     # config.time_zone = "Central Time (US & Canada)"

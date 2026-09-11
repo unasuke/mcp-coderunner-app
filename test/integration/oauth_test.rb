@@ -1,7 +1,7 @@
 require "test_helper"
 
-# /oauth/authorize が唯一の実質的な関門なので、ここは実際に通して確かめる。
-# 認可コードは member 以上のセッションからしか出ない。
+# /oauth/authorize is the one real gate, so this walks the whole thing for real.
+# An authorization code is only issued to a session holding member or above.
 class OauthTest < ActionDispatch::IntegrationTest
   REDIRECT_URI = "http://localhost:6274/oauth/callback".freeze
 
@@ -47,7 +47,7 @@ class OauthTest < ActionDispatch::IntegrationTest
     assert_redirected_to login_path
   end
 
-  # pending のユーザーができることは何もない。ログインループにも落とさない
+  # A pending user can do nothing at all -- and is not dropped into a sign-in loop either
   test "a pending user is stopped at the waiting page" do
     sign_in(role: :pending)
 
@@ -64,7 +64,7 @@ class OauthTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
-  # ここが通れば公開後の経路が成立する
+  # With this passing, the path that runs once this is public holds together
   test "the full authorization code flow with PKCE" do
     user = sign_in(role: :member)
 
@@ -85,7 +85,7 @@ class OauthTest < ActionDispatch::IntegrationTest
     token = Doorkeeper::AccessToken.by_token(body["access_token"])
     assert_equal user.id, token.resource_owner_id
 
-    # 受け取ったトークンで実際にツールが叩ける
+    # The token that came back actually reaches a tool
     post "/mcp", headers: { "Authorization" => "Bearer #{body['access_token']}" }, as: :json,
       params: { jsonrpc: "2.0", id: 1, method: "tools/list" }
 
@@ -93,7 +93,8 @@ class OauthTest < ActionDispatch::IntegrationTest
     assert_equal 4, response.parsed_body.dig("result", "tools").size
   end
 
-  # 列が無くて PKCE が黙って無視されていた穴がある。happy path だけでは再発する
+  # There was a hole where a missing column meant PKCE was silently ignored.
+  # A happy path alone lets that come back
   test "an authorization without a code_challenge is refused" do
     sign_in(role: :member)
 
@@ -103,7 +104,7 @@ class OauthTest < ActionDispatch::IntegrationTest
     assert_match(/Code challenge is required/, response.body)
   end
 
-  # plain は検証になっていない
+  # plain verifies nothing
   test "the plain challenge method is refused" do
     sign_in(role: :member)
 
@@ -114,7 +115,7 @@ class OauthTest < ActionDispatch::IntegrationTest
     assert_response :bad_request
   end
 
-  # PKCE を必須にしてあるので、verifier が違えば交換できない
+  # PKCE is required, so a verifier that does not match cannot be exchanged
   test "a wrong code_verifier is refused" do
     sign_in(role: :member)
 

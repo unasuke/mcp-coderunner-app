@@ -1,59 +1,62 @@
-# Rails 側だけの値。両方が知っていないと壊れる値（lease の窓、heartbeat の間隔、
-# プロファイル定義、protocol_version）は lib/protocol の定数にある。
+# Values the Rails side owns alone. Anything both sides have to agree on -- the
+# lease window, the heartbeat interval, the profile definitions, protocol_version --
+# lives in the constants under lib/protocol.
 shared:
-  # review_url を組み立てるのに使う
+  # Used to build review_url
   base_url: http://localhost:3000
 
-  # script はこれを超えると pending_review、その上を超えると submit_job がエラー
+  # Past the first, a script lands in pending_review; past the second, submit_job errors
   script_review_bytes: 65536
   script_max_bytes: 262144
 
-  # Blueprint の context
+  # A Blueprint's context
   dockerfile_max_bytes: 65536
   context_max_bytes: 1048576
   max_context_files: 50
 
-  # list_blueprints が返す件数
+  # How many rows list_blueprints returns
   blueprint_list_limit: 50
 
-  # 保持期間（日）
+  # Retention, in days
   refresh_token_retention_days: 30
   result_retention_days: 30
   script_retention_days: 90
   process_retention_days: 30
   lease_retention_days: 30
 
-  # 最初のログインで admin になる GitHub のログイン名。どの環境でも環境変数から読む
+  # The GitHub login that becomes admin on its first sign-in. Read from the
+  # environment in every environment
   bootstrap_admin_login: <%= ENV["BOOTSTRAP_ADMIN_GITHUB_LOGIN"] %>
 
-  # ワーカーとのずれを検知するための実装のリビジョン
+  # The revision of this implementation, used to spot drift against the worker
   commit_hash: development
 
-  # GitHub ログイン。read:user だけ要求する
+  # GitHub sign-in. It asks for read:user and nothing else
   github_client_id: <%= ENV["GITHUB_CLIENT_ID"] %>
   github_client_secret: <%= ENV["GITHUB_CLIENT_SECRET"] %>
 
-  # GitHub を経由せずにログインできる開発用の口。
-  # これは認可の中心（member 以上のセッションからしか認可コードを出さない）を
-  # 迂回する。**本番で true にしない。** 有効な環境では /auth/developer が生える
+  # The development door that signs in without going through GitHub.
+  # It bypasses the center of the authorization model -- that an authorization code
+  # is only issued to a session holding member or above. **Never true in production.**
+  # Where it is on, /auth/developer exists
   allow_developer_login: false
 
-# config_for が shared を各環境にマージする
+# config_for merges shared into each environment
 development:
   allow_developer_login: true
-  # 開発用ログインで dev と入れると admin になる。環境変数があればそちらが優先される
+  # Entering dev at the developer sign-in lands as admin. An environment variable wins over this
   bootstrap_admin_login: <%= ENV.fetch("BOOTSTRAP_ADMIN_GITHUB_LOGIN", "dev") %>
 
 test:
   base_url: http://mcp-coderunner-app.invalid
-  # 実行環境の設定に左右されないよう、テストでは常に未設定から始める
+  # Tests always start from unset, so nothing depends on how the machine is configured
   bootstrap_admin_login: ~
-  # 値そのものは使わない。OmniAuth のモックを通すために、ストラテジが
-  # 生えている状態を作る（資格情報が無い環境では登録しないため）
+  # The values themselves go unused. They exist so the strategy is registered and
+  # OmniAuth's mock has something to run through (without credentials it is not registered)
   github_client_id: test-client-id
   github_client_secret: test-client-secret
 
 production:
   base_url: <%= ENV.fetch("MCP_CODERUNNER_APP_BASE_URL", "https://mcp-coderunner-app.example.com") %>
-  # Kamal がデプロイするリビジョンを渡す。無ければビルド時に埋めた GIT_COMMIT
+  # Kamal passes the revision it deployed. Failing that, the GIT_COMMIT baked in at build time
   commit_hash: <%= ENV["KAMAL_VERSION"] || ENV["GIT_COMMIT"] || "unknown" %>

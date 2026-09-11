@@ -1,20 +1,21 @@
 version: 2
 
 updates:
-  # Rails 側の gem。ワーカーは stdlib だけで書いてあるので、ここが依存の全部になる
+  # The Rails-side gems. The worker is written against stdlib alone, so this is
+  # every dependency there is
   - package-ecosystem: bundler
     directory: "/"
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
     groups:
-      # 個別に PR が立つと読む手間だけ増える。壊れうるものだけ分ける
+      # A pull request each only adds reading. Keep separate what can actually break
       minor-and-patch:
         update-types:
           - minor
           - patch
 
-  # esbuild と Hotwire
+  # esbuild and Hotwire
   - package-ecosystem: npm
     directory: "/"
     schedule:
@@ -26,7 +27,7 @@ updates:
           - minor
           - patch
 
-  # Dockerfile の ruby イメージ（ARG RUBY_VERSION）
+  # The ruby image in the Dockerfile (ARG RUBY_VERSION)
   - package-ecosystem: docker
     directory: "/"
     schedule:

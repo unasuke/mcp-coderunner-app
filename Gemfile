@@ -17,18 +17,19 @@ gem "stimulus-rails"
 # Build JSON APIs with ease [https://github.com/rails/jbuilder]
 gem "jbuilder"
 
-# json 3.0 は JSON.parse の positional な options を落としたが、ActiveSupport 8.1.3.1 は
-# ::JSON.decode で JSON.parse(json, options) と呼ぶ。Ruby 4.0 同梱の 3.0.2 のままだと
-# JSON のリクエストボディが一切パースできない（/mcp も worker API も 500 になる）
+# json 3.0 dropped the positional options argument of JSON.parse, but ActiveSupport
+# 8.1.3.1 still calls JSON.parse(json, options) in ::JSON.decode. Left on the 3.0.2
+# that ships with Ruby 4.0, no JSON request body parses at all -- /mcp and the worker
+# API both answer 500
 gem "json", "~> 2.9"
 
 # MCP server implementation [https://github.com/modelcontextprotocol/ruby-sdk]
 gem "mcp"
 
-# OAuth 2 provider. MCP のアクセストークンを発行する
+# OAuth 2 provider. It issues the MCP access tokens
 gem "doorkeeper"
 
-# GitHub ログイン。/oauth/authorize の関門はここを通ったセッションで判定する
+# GitHub sign-in. The gate in front of /oauth/authorize judges by the session this issues
 gem "omniauth-github"
 gem "omniauth-rails_csrf_protection"
 

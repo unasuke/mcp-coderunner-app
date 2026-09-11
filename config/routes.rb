@@ -1,21 +1,22 @@
 Rails.application.routes.draw do
   use_doorkeeper
 
-  # OAuth のメタデータと動的クライアント登録（Doorkeeper が持っていない分）
-  # クライアントによってはリソースのパスを後ろに付けて引きに来る（RFC 9728 の
-  # /.well-known/oauth-protected-resource/mcp 形式）。どちらでも同じものを返す
+  # The OAuth metadata, and the dynamic client registration Doorkeeper does not ship.
+  # Some clients ask with the resource path appended (the RFC 9728
+  # /.well-known/oauth-protected-resource/mcp form). Both shapes answer the same
   get ".well-known/oauth-protected-resource(/*resource)" => "well_known#protected_resource"
   get ".well-known/oauth-authorization-server(/*resource)" => "well_known#authorization_server"
   post "oauth/register" => "oauth/registrations#create"
 
-  # GitHub ログイン
+  # GitHub sign-in
   get "login" => "sessions#new", as: :login
-  # 通常は OmniAuth のミドルウェアが受け取る。ここに届くのは
-  # GitHub の資格情報が設定されていないときだけ
+  # Normally OmniAuth's middleware takes this. A request reaching the controller
+  # means the GitHub credentials were never configured
   post "auth/github" => "sessions#github", as: :github_auth
   get "auth/github/callback" => "sessions#create"
-  # 開発用ログインのコールバック（OmniAuth のフォームから POST で来る）。
-  # 設定が無効なら 404 を返す。ストラテジ自体も生えないので二重に閉じている
+  # The developer sign-in's callback, POSTed from a form OmniAuth generated.
+  # With the setting off it answers 404, and the strategy is not registered either,
+  # so it is shut twice over
   match "auth/developer/callback" => "sessions#developer", via: [ :get, :post ]
   get "auth/failure" => "sessions#failure"
   delete "logout" => "sessions#destroy", as: :logout
@@ -45,11 +46,12 @@ Rails.application.routes.draw do
     end
   end
 
-  # MCP のリソースサーバー本体。Anthropic のレンジからのみ到達できる（Caddy 側で絞る）
+  # The MCP resource server itself. Reachable only from Anthropic's ranges, which
+  # Caddy narrows
   post "mcp" => "mcp#create", as: :mcp
   match "mcp" => "mcp#unsupported", via: [ :get, :delete ]
 
-  # ワーカーから。すべてワーカー発の HTTPS
+  # From the worker. Every one of these is HTTPS the worker started
   namespace :api do
     namespace :worker do
       namespace :v1 do

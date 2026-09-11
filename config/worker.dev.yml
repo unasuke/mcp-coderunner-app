@@ -1,10 +1,10 @@
-# bin/dev から起動する開発用のワーカー設定。
-# トークンは bin/rails mcp_coderunner_app:worker:dev_token が tmp/worker_token に置く。
+# The worker configuration for development, started by bin/dev.
+# bin/rails mcp_coderunner_app:worker:dev_token puts the token in tmp/worker_token.
 worker_id: dev
 endpoint: http://localhost:3000
 token_file: tmp/worker_token
 
-# リポジトリ内の tmp を使う（gitignore 済み）。docker に渡すときは絶対パスに直る
+# Uses tmp inside the repository (already gitignored). It becomes absolute before docker sees it
 runtime_dir: tmp/mcp-coderunner-app
 
 limits:

@@ -1,11 +1,11 @@
-# 経路ごとに分ける。Anthropic のレンジは変わりうるので、環境変数に切り出して
-# 1 箇所の更新で済むようにしておく。
+# Split by path. Anthropic's ranges can change, so they are pulled out into an
+# environment variable and updated in one place.
 #
 #   ANTHROPIC_RANGES="1.2.3.0/24 5.6.7.0/24" caddy run
 
 (anthropic_only) {
 	route {
-		# 弾くときは 403 ではなく 404。そこに MCP エンドポイントがあること自体を伏せる
+		# Refused with a 404 rather than a 403, so that an MCP endpoint being here is not itself news
 		@blocked not remote_ip {$ANTHROPIC_RANGES}
 		respond @blocked 404
 		reverse_proxy localhost:3000
@@ -15,7 +15,7 @@
 mcp-coderunner-app.example.com {
 	encode zstd gzip
 
-	# Anthropic のクラウドからのみ到達できる面
+	# The surface reachable only from Anthropic's cloud
 	handle /mcp* {
 		import anthropic_only
 	}
@@ -26,7 +26,7 @@ mcp-coderunner-app.example.com {
 		import anthropic_only
 	}
 
-	# ブラウザから。認可の関門はアプリ側の require_member!
+	# From a browser. The gate is require_member! in the application
 	handle /oauth/authorize* {
 		reverse_proxy localhost:3000
 	}
@@ -40,17 +40,17 @@ mcp-coderunner-app.example.com {
 		reverse_proxy localhost:3000
 	}
 
-	# ワーカーから。自宅が固定 IP ならここも絞る
+	# From the worker. With a static address at home, narrow this too
 	handle /api/worker/* {
 		reverse_proxy localhost:3000
 	}
 
-	# メタデータは公開のまま（RFC 9728 / RFC 8414）
+	# The metadata stays public (RFC 9728 / RFC 8414)
 	handle {
 		reverse_proxy localhost:3000
 	}
 }
 
-# remote_ip を使う（client_ip ではない）。Caddy が edge に立っているので、
-# 判定すべきは TCP の接続元。client_ip は X-Forwarded-For を見るため、
-# trusted_proxies を設定していない状態では詐称できてしまう。
+# remote_ip, not client_ip. Caddy stands at the edge here, so what matters is where
+# the TCP connection came from. client_ip reads X-Forwarded-For, which without
+# trusted_proxies configured can simply be claimed.

@@ -8,12 +8,12 @@ CI.run do
   step "Security: Gem audit", "bin/bundler-audit"
   step "Security: Yarn vulnerability audit", "yarn audit"
   step "Security: Brakeman code analysis", "bin/brakeman --quiet --no-pager --exit-on-warn --exit-on-error"
-  step "Worker: 素の ruby で読めるか", "ruby -Ilib -I. -e 'require \"worker/runner\"'"
+  step "Worker: loads under plain ruby", "ruby -Ilib -I. -e 'require \"worker/runner\"'"
   step "Tests: Worker", "ruby -Ilib -I. -e 'Dir[\"worker/test/*_test.rb\"].each { |f| require File.expand_path(f) }'"
   step "Tests: Rails", "bin/rails test"
   step "Tests: Seeds", "env RAILS_ENV=test bin/rails db:seed:replant"
 
-  # ヘッドレスの Chrome が要る。GitHub Actions では独立したジョブになっている
+  # Needs headless Chrome. In GitHub Actions this is a job of its own
   step "Tests: System", "bin/rails test:system"
 
   # Optional: set a green GitHub commit status to unblock PR merge.

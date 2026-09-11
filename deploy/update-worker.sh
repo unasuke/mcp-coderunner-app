@@ -1,13 +1,14 @@
 #!/bin/sh
-# ワーカーを origin/main に合わせて入れ替える。root で実行する。
+# Brings the worker in line with origin/main. Run as root.
 #
 #   sudo /opt/mcp-coderunner-app/deploy/update-worker.sh
 #
-# bundle install は要らない。ワーカーは stdlib だけで書かれているので、
-# ファイルを置き換えて再起動すれば済む。
+# No bundle install. The worker is written against stdlib alone, so replacing the
+# files and restarting is all of it.
 #
-# 走っているジョブは再起動で中断されるが、終了処理が /deregister を打つので
-# 試行回数を消費せずキューへ戻る。次に立ち上がったワーカーが拾い直す。
+# A restart interrupts whatever was running, but the shutdown path calls
+# /deregister, so those jobs return to the queue without consuming an attempt.
+# The worker that comes up next picks them back up.
 set -eu
 
 CHECKOUT="${CHECKOUT:-/opt/mcp-coderunner-app}"
@@ -19,24 +20,24 @@ cd "$CHECKOUT"
 before="$(git rev-parse --short HEAD)"
 
 git fetch --prune origin
-# pull ではなく reset。手元に差分が残っていても結果が一意になる
+# reset, not pull, so a dirty checkout still converges to one known state
 git reset --hard "origin/${BRANCH}"
 
 after="$(git rev-parse --short HEAD)"
 
 if [ "$before" = "$after" ]; then
-  echo "既に ${after} です。再起動だけ行います"
+  echo "already at ${after}; restarting only"
 fi
 
-# 書き忘れると /admin/workers の「ずれ」表示が嘘になる
+# Forget this and the drift warning at /admin/workers starts lying
 git rev-parse HEAD > REVISION
 
 running="$(docker ps -q --filter label=mcp-coderunner-app.job | wc -l)"
 if [ "$running" -gt 0 ]; then
-  echo "実行中のジョブ ${running} 件を中断します（キューへ戻ります）"
+  echo "interrupting ${running} running job(s); they return to the queue"
 fi
 
 systemctl restart "$UNIT"
 
-echo "${before} -> ${after} で再起動しました"
+echo "restarted: ${before} -> ${after}"
 systemctl --no-pager --lines=0 status "$UNIT" || true

@@ -1,4 +1,4 @@
-# bin/jobs（Solid Queue）が読む。development でも production でも同じ 2 つを回す。
+# Read by bin/jobs (Solid Queue). The same two run in development and production.
 shared: &shared
   lease_reaper:
     class: LeaseReaperJob

@@ -2,7 +2,7 @@ class CreateWorkerProcesses < ActiveRecord::Migration[8.1]
   def change
     create_table :worker_processes do |t|
       t.string :worker_id, null: false
-      # 起動のたびに生成する UUIDv7
+      # A UUIDv7, generated on every start
       t.string :instance_id, null: false
       t.string :hostname
       t.integer :pid
@@ -13,7 +13,7 @@ class CreateWorkerProcesses < ActiveRecord::Migration[8.1]
       t.integer :capacity, null: false
       t.json :metadata
       t.datetime :started_at, null: false
-      # 生死の判定はこの古さだけで行う。行の存在を生存の証拠にしない
+      # Whether it is alive is decided by this age alone. The row existing proves nothing
       t.datetime :last_heartbeat_at, null: false
       t.datetime :stopped_at
 

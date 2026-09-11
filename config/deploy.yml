@@ -5,13 +5,13 @@ service: mcp_coderunner_app
 image: unasuke/mcp-coderunner-app
 
 # Deploy to these servers.
-# 実アドレスはリポジトリに置かない。CI では secret から渡す。
+# The real address is not in this repository. CI passes it from a secret.
 servers:
   web:
     hosts:
       - <%= ENV.fetch("DEPLOY_HOST") %>
-    # 既存の Caddy が 80/443 を持っているので kamal-proxy は使わない。
-    # 無効化はロール側で指定する（トップレベルの proxy: はプロキシ自身の設定）
+    # An existing Caddy owns 80/443, so kamal-proxy is not used. Turning it off is
+    # said at the role level (a top-level proxy: configures the proxy itself)
     proxy: false
     options:
       publish: [ "127.0.0.1:3000:80" ]
@@ -20,13 +20,13 @@ servers:
   #     - 192.168.0.1
   #   cmd: bin/jobs
 
-# コンテナは localhost の固定ポートに publish し、Caddy から
-# reverse_proxy localhost:3000 で拾う。証明書も Caddy の自動 HTTPS に任せる
+# The container publishes to a fixed port on localhost, and Caddy picks it up with
+# reverse_proxy localhost:3000. Certificates are left to Caddy's automatic HTTPS
 # （deploy/Caddyfile.example）。
 
-# イメージは手元か CI でビルドして push し、サーバーは pull するだけ。
-# VPS ではビルドしない。
-# CI からは GITHUB_TOKEN を使い捨てで渡す。手元からは自分の PAT
+# The image is built locally or in CI and pushed; the server only pulls.
+# Nothing is built on the VPS.
+# From CI the throwaway GITHUB_TOKEN is passed; from a laptop, your own PAT
 registry:
   server: ghcr.io
   username: <%= ENV.fetch("KAMAL_REGISTRY_USERNAME", "unasuke") %>
@@ -39,13 +39,13 @@ env:
     - RAILS_MASTER_KEY
     - GITHUB_CLIENT_SECRET
   clear:
-    # ホスト名とログイン名もリポジトリに置かない。CI では secret から渡す
+    # The hostname and the login name are not in this repository either. CI passes them from secrets
     MCP_CODERUNNER_APP_BASE_URL: <%= ENV.fetch("MCP_CODERUNNER_APP_BASE_URL") %>
     GITHUB_CLIENT_ID: <%= ENV.fetch("GITHUB_CLIENT_ID") %>
     BOOTSTRAP_ADMIN_GITHUB_LOGIN: <%= ENV.fetch("BOOTSTRAP_ADMIN_GITHUB_LOGIN") %>
 
-    # ワーカーが 25 秒のロングポーリングでスレッドを 1 本占有する。
-    # 「ワーカーのインスタンス数 + ブラウザと MCP の分」を確保する
+    # A worker holds one thread for a 25-second long poll. Leave room for the number
+    # of worker instances, plus the browser and MCP
     RAILS_MAX_THREADS: 8
 
     # Run the Solid Queue Supervisor inside the web server's Puma process to do jobs.
@@ -97,7 +97,7 @@ builder:
   #   - GITHUB_TOKEN
   #   - RAILS_MASTER_KEY
 
-# opkssh の auth_id がどの Linux ユーザーに割り当てるかに合わせる
+# Matches whichever Linux user opkssh's auth_id maps to
 ssh:
   user: <%= ENV.fetch("DEPLOY_SSH_USER", "root") %>
 

@@ -62,16 +62,17 @@ jobs:
         with:
           bundler-cache: true
 
-      # Rails を読まずに require できることを保証する。開発機では Rails 経由で
-      # 通ってしまうので、ActiveSupport の混入は人間のレビューでは捕まえられない
+      # Guarantees the worker can be required without Rails. On a development
+      # machine it loads anyway by way of Rails, which is why an ActiveSupport
+      # extension slipping in is not something human review catches
       - name: Load the worker without Rails
         run: ruby -Ilib -I. -e 'require "worker/runner"'
 
       - name: Run worker unit tests
         run: ruby -Ilib -I. -e 'Dir["worker/test/*_test.rb"].each { |f| require File.expand_path(f) }'
 
-      # 実際に docker を回す唯一のテスト。--network none が効いていることと、
-      # cgroup から統計が取れることを見る
+      # The only test that actually drives docker. It watches that --network none
+      # holds, and that statistics come back from the cgroup
       - name: Run the docker end-to-end test
         env:
           MCP_CODERUNNER_APP_E2E: "1"
@@ -141,37 +142,38 @@ jobs:
           path: ${{ github.workspace }}/tmp/screenshots
           if-no-files-found: ignore
 
-  # main に入ったものだけを、上のジョブが全部通ってからデプロイする。
-  # VPS への ssh は opkssh。長命の鍵を置かず、GitHub Actions の OIDC で入る
+  # Only what landed on main, and only once every job above has passed.
+  # ssh to the VPS is opkssh: no long-lived key anywhere, just the GitHub Actions
+  # OIDC token
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [ scan_ruby, lint, worker, test, system-test ]
     runs-on: ubuntu-latest
 
-    # デプロイに使う値はこの environment の secret に入れてある。
-    # environment を宣言すると OIDC トークンの sub も
-    # repo:<owner>/<repo>:environment:production になる（opkssh の auth_id と揃える）
+    # What deployment needs lives in this environment's secrets.
+    # Declaring an environment also makes the OIDC token's sub
+    # repo:<owner>/<repo>:environment:production, which is what opkssh's auth_id matches
     environment: production
 
-    # 同時に 2 本走らせない。走っている分は最後まで流す
+    # Never two at once, and whatever is already running is left to finish
     concurrency:
       group: deploy
       cancel-in-progress: false
 
     permissions:
       contents: read
-      packages: write   # ghcr.io へ push する
-      id-token: write   # opkssh が使う OIDC トークン
+      packages: write   # to push to ghcr.io
+      id-token: write   # the OIDC token opkssh uses
 
     env:
       DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
       DEPLOY_SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
       MCP_CODERUNNER_APP_BASE_URL: ${{ secrets.MCP_CODERUNNER_APP_BASE_URL }}
       BOOTSTRAP_ADMIN_GITHUB_LOGIN: ${{ secrets.BOOTSTRAP_ADMIN_GITHUB_LOGIN }}
-      # GITHUB_ で始まる名前の secret は作れないので、別名から移し替える
+      # A secret's name cannot start with GITHUB_, so they are copied across from another name
       GITHUB_CLIENT_ID: ${{ secrets.OAUTH_GITHUB_CLIENT_ID }}
       GITHUB_CLIENT_SECRET: ${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }}
-      # push も pull もこのジョブの寿命だけ有効なトークンで済ませる
+      # Both the push and the pull run on a token valid only for this job's lifetime
       KAMAL_REGISTRY_USERNAME: ${{ github.actor }}
       KAMAL_REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
 
@@ -192,8 +194,8 @@ jobs:
         with:
           ssh-hosts-to-scan: ${{ secrets.DEPLOY_HOST }}
 
-      # Kamal は net-ssh で繋ぐ。証明書は agent 経由でないと拾われないことがあるので、
-      # opkssh が書いた鍵を明示的に読ませる
+      # Kamal connects through net-ssh, which does not always pick up the certificate
+      # unless it comes by way of an agent, so the key opkssh wrote is added explicitly
       - name: Hand the opkssh certificate to an agent
         run: |
           eval "$(ssh-agent -s)"
@@ -205,7 +207,7 @@ jobs:
           done
           ssh-add -l
 
-      # .kamal/secrets は手元の config/master.key を読む。CI には無いので置く
+      # .kamal/secrets reads config/master.key from the checkout. CI has none, so write it
       - name: Write the master key
         run: |
           install -m 600 /dev/null config/master.key

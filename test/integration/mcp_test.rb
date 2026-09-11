@@ -24,7 +24,7 @@ class McpTest < ActionDispatch::IntegrationTest
     [ JSON.parse(content), body.dig("result", "isError") ]
   end
 
-  # 401 の WWW-Authenticate からリソースメタデータを指す（RFC 9728）
+  # The WWW-Authenticate of a 401 points at the resource metadata (RFC 9728)
   test "an unauthenticated request points at the resource metadata" do
     post "/mcp", as: :json, params: { jsonrpc: "2.0", id: 1, method: "tools/list" }
 
@@ -58,7 +58,7 @@ class McpTest < ActionDispatch::IntegrationTest
     assert_equal @user, blueprint.created_by
     assert_equal @application, blueprint.oauth_application
 
-    # 名前だけ違う同一内容も同じ行に落ちる
+    # Identical content under a different name lands on the same row
     again, = tool("propose_blueprint", {
       name: "different-name", summary: "べつの説明", dockerfile: "FROM ruby:3.4-slim\n",
       files: [ { path: "Gemfile", content: "source 'https://rubygems.org'\n" } ]
@@ -69,7 +69,7 @@ class McpTest < ActionDispatch::IntegrationTest
     assert_equal "ruby-3.4", again["name"]
   end
 
-  # /admin が前の版との差分でレビューできるように、同じ名前の直前の版に繋ぐ
+  # Chained to the previous revision under the same name, so /admin can review it as a diff
   test "a second proposal under the same name links to the previous one" do
     first, = tool("propose_blueprint", {
       name: "ruby-3.4", summary: "最初の版", dockerfile: "FROM ruby:3.4-slim\n"
@@ -105,7 +105,7 @@ class McpTest < ActionDispatch::IntegrationTest
     assert_nil payload["review_url"]
   end
 
-  # digest 指定なら未承認でも受け付ける。Job が pending_review に入る
+  # Naming a digest is accepted even unapproved. The job lands in pending_review
   test "submit_job on an unapproved blueprint waits for review" do
     blueprint = Blueprint.create!(name: "waiting", summary: "x", dockerfile: "FROM a\n",
       digest: Blueprint.digest_for(dockerfile: "FROM a\n", files: []))
@@ -116,7 +116,7 @@ class McpTest < ActionDispatch::IntegrationTest
     assert_match %r{/admin/jobs/\d+}, payload["review_url"]
   end
 
-  # 一度断った内容は digest を知っていても投げ直せない
+  # Content already turned down cannot be submitted again by anyone holding the digest
   test "submit_job refuses a rejected or revoked blueprint" do
     rejected = Blueprint.create!(name: "no", summary: "x", dockerfile: "FROM a\n",
       digest: Blueprint.digest_for(dockerfile: "FROM a\n", files: []),
@@ -138,7 +138,7 @@ class McpTest < ActionDispatch::IntegrationTest
     end
   end
 
-  # bench は承認が要る
+  # bench needs approval
   test "the bench profile waits for review" do
     Blueprint.create!(name: "ready", summary: "y", dockerfile: "FROM b\n",
       digest: Blueprint.digest_for(dockerfile: "FROM b\n", files: []), state: :approved)
@@ -182,8 +182,9 @@ class McpTest < ActionDispatch::IntegrationTest
     assert_equal({ "memory_mb" => 2048 }, payload["applied_limits"])
   end
 
-  # 保持期間を過ぎたことが応答から読めれば、結果が空なのを実行の失敗と誤読しない。
-  # 終了理由まで消えると「まだ結果が無い」と区別がつかなくなる
+  # With retention visible in the response, an empty result is not misread as a
+  # failed run. Losing the termination reason too would make it indistinguishable
+  # from "no result yet"
   test "a purged job keeps its reason and says the body is gone" do
     blueprint = Blueprint.create!(name: "ready", summary: "y", dockerfile: "FROM b\n",
       digest: Blueprint.digest_for(dockerfile: "FROM b\n", files: []), state: :approved)
@@ -216,8 +217,9 @@ class McpTest < ActionDispatch::IntegrationTest
     assert_equal "http://mcp-coderunner-app.invalid/oauth/register", response.parsed_body["registration_endpoint"]
   end
 
-  # 権限の判定をトークンの寿命（15 分）に任せない。revoke を経ない経路
-  # （コンソールからの直接更新など）でも、その場で止まること
+  # What someone is allowed to do is not left to a token's 15-minute lifetime. Even
+  # by a path that never calls revoke -- an update straight from the console, say --
+  # it stops at once
   test "a live token is refused once the user is no longer a member" do
     assert_equal 4, rpc("tools/list").dig("result", "tools").size
 
@@ -230,7 +232,7 @@ class McpTest < ActionDispatch::IntegrationTest
     assert_equal "forbidden", response.parsed_body["error"]
   end
 
-  # 管理画面からの降格はトークンごと切る
+  # A demotion from the admin console cuts the tokens as well
   test "demotion revokes the tokens, so refreshing does not get a new one" do
     @user.approve!(by: @user, role: :pending)
 
@@ -261,7 +263,7 @@ class McpTest < ActionDispatch::IntegrationTest
     assert_equal "invalid_grant", response.parsed_body["error"]
   end
 
-  # 既定スコープを満たさないトークンは 403 を JSON で返す（HTML のエラーページにしない）
+  # A token short of the default scope gets a 403 in JSON, not an HTML error page
   test "a token without the scope is forbidden" do
     scopeless = Doorkeeper::AccessToken.create!(
       application: @application, resource_owner_id: @user.id, expires_in: 900, scopes: ""
@@ -285,7 +287,7 @@ class McpTest < ActionDispatch::IntegrationTest
     assert_predicate Doorkeeper::Application.find_by(uid: response.parsed_body["client_id"]), :present?
   end
 
-  # SSE のストリームは提供しないので 405（仕様上の MUST）
+  # No SSE stream is offered, so 405 (a MUST in the specification)
   test "GET and DELETE on the endpoint are refused with 405" do
     get "/mcp", headers: { "Authorization" => "Bearer #{@token.plaintext_token}" }
 
@@ -297,7 +299,7 @@ class McpTest < ActionDispatch::IntegrationTest
     assert_response :method_not_allowed
   end
 
-  # クライアントによってはリソースのパスを後ろに付けて引きに来る
+  # Some clients ask with the resource path appended
   test "the resource metadata also answers under the resource path" do
     get "/.well-known/oauth-protected-resource/mcp"
 

@@ -27,7 +27,7 @@ class Jobs::ClaimTest < ActiveSupport::TestCase
     assert_nil claim
   end
 
-  # bench 中に他のジョブを走らせると、測定値が壊れても結果からは分からない
+  # Another job running alongside bench ruins the measurement, and the result still looks fine
   test "hands out nothing at all while an exclusive job runs" do
     job(profile: "bench", state: :running)
     job(profile: "default")
@@ -36,7 +36,7 @@ class Jobs::ClaimTest < ActiveSupport::TestCase
     assert_nil claim
   end
 
-  # bench を始めるのは、走っているものが無いときだけ
+  # bench starts only when nothing else is running
   test "holds back an exclusive job while anything else runs" do
     job(profile: "default", state: :running)
     bench = job(profile: "bench")
@@ -54,7 +54,7 @@ class Jobs::ClaimTest < ActiveSupport::TestCase
     assert_equal bench, claim.job
   end
 
-  # 中断を要求されたジョブを拾い直さない
+  # A job someone asked to stop is not picked back up
   test "skips a job that has been asked to cancel" do
     job(cancel_requested_at: Time.current)
 

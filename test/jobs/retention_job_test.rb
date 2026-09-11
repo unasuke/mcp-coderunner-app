@@ -11,7 +11,7 @@ class RetentionJobTest < ActiveSupport::TestCase
       created_at:, updated_at: created_at)
   end
 
-  # script は not null のまま。消したことは purged_at で表す
+  # script stays not null, and purged_at is what says it was cleared
   test "old scripts are emptied and stamped" do
     old = finished_job(created_at: 100.days.ago)
     recent = finished_job(created_at: 1.day.ago)
@@ -24,8 +24,8 @@ class RetentionJobTest < ActiveSupport::TestCase
     refute_predicate recent, :purged?
   end
 
-  # 行ごと消すと termination_reason まで失われ、get_job が「まだ結果が無い」と
-  # 見分けがつかなくなる
+  # Deleting the row would take termination_reason with it, leaving get_job unable
+  # to tell this apart from "no result yet"
   test "old outputs are emptied but the reason survives" do
     job = finished_job(created_at: 100.days.ago)
     JobResult.create!(job:, termination_reason: "oom_killed", exit_code: 137, stdout: "x" * 100,
@@ -53,7 +53,7 @@ class RetentionJobTest < ActiveSupport::TestCase
     refute_predicate job, :purged?
   end
 
-  # アクセストークンは 15 分で切れるが、リフレッシュには寿命が無い
+  # An access token expires in 15 minutes; a refresh token has no lifetime of its own
   test "refresh tokens are revoked once they go unused" do
     application = Doorkeeper::Application.create!(name: "claude", redirect_uri: "https://claude.invalid/cb",
       confidential: false, scopes: "")

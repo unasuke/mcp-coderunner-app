@@ -5,7 +5,7 @@ class CreateUsers < ActiveRecord::Migration[8.1]
       t.string :login, null: false
       t.string :name
       t.string :avatar_url
-      # 既定値は pending。役割の設定を書き忘れたユーザーは何もできない
+      # Defaults to pending, so a user whose role nobody set can do nothing
       t.string :role, null: false, default: "pending"
       t.datetime :approved_at
       t.references :approved_by, foreign_key: { to_table: :users }

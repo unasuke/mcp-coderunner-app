@@ -35,7 +35,8 @@ class WorkerApiTest < ActionDispatch::IntegrationTest
     assert_response :unauthorized
   end
 
-  # worker_id はトークンから引く。body の自己申告で別のワーカーになりすませない
+  # The worker_id comes from the token. Nothing a client says about itself in the
+  # body can pass it off as a different worker
   test "worker_id mismatch is rejected" do
     post "/api/worker/v1/register", headers: auth_headers, as: :json, params: {
       worker_id: "someone-else", instance_id: INSTANCE_ID, commit_hash: "abc",
@@ -67,7 +68,7 @@ class WorkerApiTest < ActionDispatch::IntegrationTest
     assert_equal 2048, lease.dig("limits", "memory_mb")
     assert_equal "leased", @job.reload.state
 
-    # 最初の job heartbeat で running に移る
+    # The first job heartbeat moves it to running
     post "/api/worker/v1/jobs/#{@job.id}/heartbeat", headers: auth_headers, as: :json,
       params: { lease_token: lease["lease_token"] }
 
@@ -89,7 +90,7 @@ class WorkerApiTest < ActionDispatch::IntegrationTest
     assert_equal "completed", @job.leases.first.release_reason
   end
 
-  # 二重実行の結果で上書きされるのを防ぐ
+  # Keeps the result of a double run from overwriting the real one
   test "a stale lease token is refused with 409" do
     register!
     post "/api/worker/v1/lease", headers: auth_headers, as: :json,
@@ -105,7 +106,7 @@ class WorkerApiTest < ActionDispatch::IntegrationTest
     assert_nil @job.reload.job_result
   end
 
-  # 会話が成立しないので lease を止める
+  # The two sides cannot hold a conversation, so leasing stops
   test "a protocol mismatch stops leasing and drains" do
     register!
 
@@ -121,7 +122,7 @@ class WorkerApiTest < ActionDispatch::IntegrationTest
     assert response.parsed_body["drain"]
   end
 
-  # 正常な再起動は試行回数を見ずに queued へ戻す
+  # An orderly restart requeues without consulting the attempt count
   test "deregister releases held leases and requeues" do
     register!
     post "/api/worker/v1/lease", headers: auth_headers, as: :json,
@@ -137,8 +138,9 @@ class WorkerApiTest < ActionDispatch::IntegrationTest
     assert_predicate WorkerProcess.find_by(instance_id: INSTANCE_ID).stopped_at, :present?
   end
 
-  # クラッシュした側は /deregister を打てない。register での片付けは異常終了の
-  # 受け皿なので、試行回数を消費させないと無限に拾い続ける
+  # A process that crashed never called /deregister. The cleanup in register is
+  # where an unclean exit lands, so unless it consumes an attempt the same job gets
+  # picked up forever
   test "re-registering after a crash counts the attempt" do
     register!
     post "/api/worker/v1/lease", headers: auth_headers, as: :json,

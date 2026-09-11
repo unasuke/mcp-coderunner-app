@@ -25,7 +25,8 @@ Rails.application.configure do
   config.active_storage.service = :local
 
   # Assume all access to the app is happening through a SSL-terminating reverse proxy.
-  # Caddy が TLS を終端して localhost:3000 に平文で渡す。X-Forwarded-Proto は Caddy が付ける
+  # Caddy terminates TLS and hands it to localhost:3000 in the clear. Caddy is what
+  # sets X-Forwarded-Proto
   config.assume_ssl = true
 
   # Force all access to the app over SSL, use Strict-Transport-Security, and use secure cookies.

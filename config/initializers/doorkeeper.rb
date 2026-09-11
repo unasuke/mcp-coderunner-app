@@ -21,8 +21,9 @@ Doorkeeper.configure do
   # See: https://guides.rubyonrails.org/active_record_multiple_databases.html#activating-automatic-role-switching
 
   # This block will be called to check whether the resource owner is authenticated or not.
-  # /oauth/authorize はブラウザで開かれる。ここが唯一の実質的な関門。
-  # DCR 自体に認証は無いが、認可コードは member 以上のセッションからしか出ない。
+  # /oauth/authorize opens in a browser, and this is the one real gate. DCR itself
+  # authenticates nobody, but an authorization code is only issued to a session
+  # holding member or above.
   resource_owner_authenticator do
     authenticate_resource_owner_for_oauth
   end
@@ -190,10 +191,10 @@ Doorkeeper.configure do
   # Require non-confidential clients to use PKCE when using an authorization code
   # to obtain an access_token (disabled by default)
   #
-  # DCR で発行するのは public クライアント。client_secret を持てるかどうかに依存させない
+  # DCR registers public clients, so nothing rests on whether a client can hold a client_secret
   force_pkce
 
-  # plain は検証になっていない。S256 だけ受け付ける
+  # plain verifies nothing. S256 and only S256
   pkce_code_challenge_methods %w[ S256 ]
 
   # Hash access and refresh tokens before persisting them.
@@ -203,8 +204,9 @@ Doorkeeper.configure do
   # Note: If you are already a user of doorkeeper and have existing tokens
   # in your installation, they will be invalid without adding 'fallback: :plain'.
   #
-  # DB に平文のトークンを置かない。セッション・ワーカー・lease と揃える。
-  # まだ本番で常用していないので、既存の平文行は捨ててハッシュのみにする
+  # No plaintext token in the database, in step with sessions, workers and leases.
+  # Nothing is in daily production use yet, so existing plaintext rows are dropped
+  # rather than kept as a fallback
   hash_token_secrets
   # By default, token secrets will be hashed using the
   # +Doorkeeper::Hashing::SHA256+ strategy.
@@ -250,7 +252,7 @@ Doorkeeper.configure do
   # `grant_type` - the grant type of the request (see Doorkeeper::OAuth)
   # `scopes` - the requested scopes (see Doorkeeper::OAuth::Scopes)
   #
-  # 使ったリフレッシュトークンはその場で失効し、新しいものが発行される（Doorkeeper の既定）
+  # A refresh token is revoked as it is used, and a new one issued (Doorkeeper's default)
   use_refresh_token
 
   # Provide support for an owner to be assigned to each registered application (disabled by default)
@@ -265,8 +267,9 @@ Doorkeeper.configure do
   # For more information go to
   # https://doorkeeper.gitbook.io/guides/ruby-on-rails/scopes
   #
-  # スコープは 1 つだけ持つ。クライアントが scope を送ってこなくても認可を通したいので、
-  # 既定スコープとして宣言しておく（無いと "Missing required parameter: scope." で弾かれる）。
+  # There is one scope. It is declared as the default so that a client sending no
+  # scope still gets through (without it, the request fails with
+  # "Missing required parameter: scope.").
   default_scopes :mcp
 
   # default_scopes  :public
@@ -319,9 +322,10 @@ Doorkeeper.configure do
   # #call can be used in order to allow conditional checks (to allow non-SSL
   # redirects to localhost for example).
   #
-  # ループバックだけ平文を許す。RFC 8252 のネイティブアプリと同じ扱いで、
-  # MCP Inspector のコールバック（http://localhost:6274/...）がここに当たる。
-  # Oauth::RegistrationsController の検証と同じ基準にしておく（環境では分けない）。
+  # Plain HTTP is allowed on loopback and nowhere else -- the same treatment RFC 8252
+  # gives native apps, and where MCP Inspector's callback (http://localhost:6274/...)
+  # lands. Held to the same rule as Oauth::RegistrationsController, and not varied
+  # by environment.
   force_ssl_in_redirect_uri { |uri| ![ "localhost", "127.0.0.1", "::1" ].include?(uri.host) }
   # force_ssl_in_redirect_uri !Rails.env.development?
   #

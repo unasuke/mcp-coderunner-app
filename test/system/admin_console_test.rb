@@ -1,15 +1,15 @@
 require "application_system_test_case"
 
-# 管理画面は人間しか通らない唯一の面で、承認はここにしかない。
-# リクエストレベルの検証は test/integration/admin_test.rb にある。
-# ここで見るのは、ブラウザを通さないと分からないことだけに絞る。
+# The admin console is the only surface a human touches, and approval lives nowhere
+# else. The request-level checks are in test/integration/admin_test.rb. What is here
+# is kept to what cannot be seen without a browser.
 class AdminConsoleTest < ApplicationSystemTestCase
   setup do
     OmniAuth.config.test_mode = true
     OmniAuth.config.mock_auth[:github] = OmniAuth::AuthHash.new(
       provider: "github", uid: "1", info: { nickname: "unasuke", name: "unasuke", image: nil }
     )
-    # 1 人目だけが admin になる。ログインの経路ごと通す
+    # Only the first user becomes admin. This walks the whole sign-in path
     Rails.configuration.x.mcp_coderunner_app.bootstrap_admin_login = "unasuke"
   end
 
@@ -19,8 +19,8 @@ class AdminConsoleTest < ApplicationSystemTestCase
     OmniAuth.config.test_mode = false
   end
 
-  # 承認は Blueprint から Job への一方向で、順番を飛ばせない。
-  # 画面の上でも同じ順序でしか進めないことを見る
+  # Approval runs one way, Blueprint before Job, and the order cannot be skipped.
+  # This watches that the screen allows no other sequence either
   test "a job stays unapprovable until its blueprint is approved" do
     blueprint = create_blueprint
     job = Job.create!(blueprint:, script: "puts 1\n", profile: "default")
@@ -49,9 +49,9 @@ class AdminConsoleTest < ApplicationSystemTestCase
     assert_predicate job.reload, :queued?
   end
 
-  # かつて meta http-equiv="refresh" で自動更新していた。あれはページを離れても
-  # ブラウザ側のタイマーが生き残り、別の画面を見ているのに引き戻された。
-  # Stimulus の disconnect で止まっていることを、実際に間隔をまたいで確かめる
+  # This used to refresh through meta http-equiv="refresh". That timer outlived the
+  # page: it kept firing after a visit elsewhere and pulled the reader back mid-read.
+  # This waits past the interval to see that Stimulus's disconnect really stopped it
   test "leaving a running job's page stops the auto refresh" do
     job = Job.create!(blueprint: create_blueprint(state: :approved), script: "puts 1\n",
       profile: "default", state: :running)
@@ -64,12 +64,12 @@ class AdminConsoleTest < ApplicationSystemTestCase
     click_on "実行環境"
 
     assert_current_path admin_blueprints_path
-    sleep 6  # 更新間隔 5 秒を 1 回またぐ
+    sleep 6  # one tick past the 5-second interval
     assert_current_path admin_blueprints_path
   end
 
-  # 承認は外出先の電話からでも通せる必要がある。横スクロールが出ると
-  # 表の右端にある操作に届かない
+  # Approving has to work from a phone, away from a desk. A horizontal scrollbar
+  # puts the actions at the right edge of a table out of reach
   test "the console fits a phone-sized viewport" do
     job = Job.create!(blueprint: create_blueprint(state: :approved), script: "puts 1\n",
       profile: "default", state: :queued)
@@ -107,8 +107,8 @@ class AdminConsoleTest < ApplicationSystemTestCase
     page.driver.browser.manage.window.resize_to(390, 844)
   end
 
-  # 表や Dockerfile のような広いものは、それぞれの器の中で横スクロールさせる。
-  # ページ全体が横に伸びていないことを見る
+  # Wide things -- tables, Dockerfiles -- scroll sideways inside their own container.
+  # What this watches is that the page as a whole does not
   def assert_no_horizontal_overflow
     overflow = page.evaluate_script(
       "document.documentElement.scrollWidth - document.documentElement.clientWidth"

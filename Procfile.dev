@@ -1,4 +1,4 @@
 web: env RUBY_DEBUG_OPEN=true bin/rails server
 js: yarn build --watch
-# ジョブを実行するワーカー。トークンが無ければ最初に発行する
+# The worker that runs jobs. It issues a token first if there is none
 worker: bin/rails mcp_coderunner_app:worker:dev_token && ruby bin/worker --config config/worker.dev.yml

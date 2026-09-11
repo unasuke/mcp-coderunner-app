@@ -2,10 +2,10 @@ class CreateBlueprints < ActiveRecord::Migration[8.1]
   def change
     create_table :blueprints do |t|
       t.string :name, null: false
-      # レビューする人間が最初に読む 1 行。digest には含めない
+      # The one line a reviewer reads first. Not part of the digest
       t.string :summary, null: false
       t.text :dockerfile, null: false
-      # 正規化した内容の SHA256。64 桁の hex で、sha256: の prefix は付けない
+      # SHA256 of the normalized content: 64 hex digits, with no sha256: prefix
       t.string :digest, null: false
       t.string :state, null: false, default: "pending_review"
       t.references :created_by, foreign_key: { to_table: :users }
@@ -13,14 +13,14 @@ class CreateBlueprints < ActiveRecord::Migration[8.1]
       t.references :reviewed_by, foreign_key: { to_table: :users }
       t.datetime :reviewed_at
       t.text :review_note
-      # 改訂元。差分レビューのため
+      # The revision this came from, so review can read it as a diff
       t.references :parent, foreign_key: { to_table: :blueprints }
 
       t.timestamps
     end
 
     add_index :blueprints, :digest, unique: true
-    # name 指定は「同名で最新の approved」を引く
+    # Naming a Blueprint resolves to the newest approved row under that name
     add_index :blueprints, [ :name, :state, :created_at ]
   end
 end

@@ -21,8 +21,9 @@ class AdminTest < ActionDispatch::IntegrationTest
     User.find_by(github_uid: uid).update!(role:)
   end
 
-  # 本番相当の設定では開発用ログインの口が存在しない。
-  # これは認可の中心を迂回する口なので、設定が無効なら経路ごと消えていること
+  # Under production-like configuration the developer sign-in does not exist.
+  # It bypasses the center of the authorization model, so with the setting off the
+  # route itself has to be gone
   test "the developer login is absent unless it is explicitly allowed" do
     refute Rails.configuration.x.mcp_coderunner_app.allow_developer_login
 
@@ -50,7 +51,7 @@ class AdminTest < ActionDispatch::IntegrationTest
     Rails.configuration.x.mcp_coderunner_app.bootstrap_admin_login = nil
   end
 
-  # 以降の新規ログインは全員 pending。できることは何もない
+  # Every sign-in after the first is pending, and can do nothing at all
   test "later logins land on pending and cannot reach admin" do
     sign_in(role: :pending)
 
@@ -91,7 +92,7 @@ class AdminTest < ActionDispatch::IntegrationTest
     assert_equal "curl | sh はだめ", @blueprint.review_note
   end
 
-  # 一度失効させたものを POST だけで承認に戻せない
+  # Something revoked cannot be walked back to approved by a POST
   test "a revoked blueprint cannot be approved again" do
     sign_in
     @blueprint.update!(state: :revoked)
@@ -129,8 +130,9 @@ class AdminTest < ActionDispatch::IntegrationTest
     assert_equal "queued", job.reload.state
   end
 
-  # digest を指定すれば未承認の実行環境でもジョブは作れる。そこから実行へ進む
-  # 経路を塞いでおかないと、Dockerfile を読まずに走らせられる
+  # Naming a digest is enough to create a job against an unapproved Blueprint.
+  # Without closing the path from there to execution, something could run without
+  # anyone having read the Dockerfile
   test "a job on an unapproved blueprint cannot be approved" do
     sign_in
     job = Job.create!(blueprint: @blueprint, script: "puts 1", profile: "default")
@@ -151,7 +153,7 @@ class AdminTest < ActionDispatch::IntegrationTest
     assert_equal "pending_review", job.reload.state
   end
 
-  # 承認できない状態でも却下はできる。溜めたままにしない
+  # A job that cannot be approved can still be rejected, so it does not pile up
   test "a job on an unapproved blueprint can still be rejected" do
     sign_in
     job = Job.create!(blueprint: @blueprint, script: "puts 1", profile: "default")
@@ -161,7 +163,7 @@ class AdminTest < ActionDispatch::IntegrationTest
     assert_equal "rejected", job.reload.state
   end
 
-  # queued はその場で finished（cancelled）にする。ワーカーは関与しない
+  # A queued job is finished as cancelled right here. No worker is involved
   test "cancelling a queued job finishes it immediately" do
     sign_in
     job = Job.create!(blueprint: @blueprint, script: "puts 1", profile: "default", state: :queued)
@@ -172,7 +174,7 @@ class AdminTest < ActionDispatch::IntegrationTest
     assert_equal "cancelled", job.job_result.termination_reason
   end
 
-  # running はワーカーに伝えるだけ。heartbeat の応答で拾わせる
+  # A running job is only told to the worker, which picks it up in a heartbeat response
   test "cancelling a running job only records the request" do
     sign_in
     job = Job.create!(blueprint: @blueprint, script: "puts 1", profile: "default", state: :running)
@@ -191,11 +193,11 @@ class AdminTest < ActionDispatch::IntegrationTest
     worker = Worker.find_by(worker_id: "home-vm-01")
 
     assert_predicate worker, :present?
-    # 平文は表示用に一度だけ渡す。保存されるのはハッシュだけ
+    # The plaintext is handed over once for display. What is stored is the hash
     assert_equal Worker.digest(flash[:issued_token]), worker.token_digest
   end
 
-  # 平文は 1 度しか出ない。無くしたら再発行する。行は増やさない
+  # The plaintext appears once. Losing it means issuing a new one, without adding a row
   test "issuing a token again rotates it in place" do
     sign_in
     worker, first = Worker.issue!(worker_id: "home-vm-01")

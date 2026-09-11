@@ -1,7 +1,7 @@
 class CreateJobResults < ActiveRecord::Migration[8.1]
   def change
     create_table :job_results do |t|
-      # 結果はジョブに 1 行だけ。最初に届いたものを採用する
+      # One result row per job. The first to arrive is the one that counts
       t.references :job, null: false, foreign_key: true, index: { unique: true }
       t.string :termination_reason, null: false
       t.integer :exit_code
@@ -11,9 +11,9 @@ class CreateJobResults < ActiveRecord::Migration[8.1]
       t.integer :duration_ms
       t.integer :cpu_time_ms
       t.bigint :max_rss_bytes
-      # docker が返す "sha256:..." 形式。Blueprint の digest とは別物
+      # The "sha256:..." form docker returns. Not the same thing as a Blueprint's digest
       t.string :image_digest
-      # ワーカーが実際に適用した値
+      # What the worker actually applied
       t.json :applied_limits, null: false
       t.string :worker_id
 

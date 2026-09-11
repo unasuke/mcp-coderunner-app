@@ -11,16 +11,16 @@ SupplementaryGroups=docker
 WorkingDirectory=/opt/mcp-coderunner-app
 ExecStart=/usr/bin/ruby /opt/mcp-coderunner-app/bin/worker --config /etc/mcp-coderunner-app/config.yml
 
-# トークンは環境変数に置かない。/proc/PID/environ にも systemctl show にも出ない
+# The token is not in the environment. It shows up in neither /proc/PID/environ nor systemctl show
 LoadCredential=api_token:/etc/mcp-coderunner-app/token
 
-# 異常終了するとジョブコンテナが残る。label で回収する
-# systemd はコマンド置換をしないので sh を挟む
+# An unclean exit leaves job containers behind. They are collected by label.
+# systemd does not do command substitution, hence the sh
 ExecStartPre=-/bin/sh -c 'docker ps -aq --filter label=mcp-coderunner-app.job | xargs -r docker rm --force --volumes'
 ExecStopPost=-/bin/sh -c 'docker ps -aq --filter label=mcp-coderunner-app.job | xargs -r docker rm --force --volumes'
 
-# SIGTERM を受けたワーカーは実行中のコンテナを片付けてから終わる。
-# ここが短いと、リースが切れるまでジョブが宙吊りになる
+# On SIGTERM the worker clears the running containers before it exits.
+# Too short here, and a job hangs until its lease expires
 TimeoutStopSec=90
 Restart=always
 RestartSec=5
@@ -28,15 +28,16 @@ RestartSec=5
 RuntimeDirectory=mcp-coderunner-app
 StateDirectory=mcp-coderunner-app
 
-# 注意: SupplementaryGroups=docker は実質 root。docker socket に触れる時点で
-# unit のハードニング項目は大半が意味を失う。実際の隔離境界は VM であって、この unit ではない
+# Note: SupplementaryGroups=docker is root in all but name. Once something can reach
+# the docker socket, most of a unit's hardening stops meaning anything. The real
+# boundary is the VM, not this unit
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
 
-# ジョブコンテナは dockerd 側の cgroup に属するので、ここの MemoryMax は
-# ワーカー自身にしか効かない。コンテナの制限は docker run のフラグで行う
+# A job container belongs to dockerd's cgroup, so MemoryMax here binds the worker
+# itself and nothing else. The container's limits are set by docker run's flags
 MemoryMax=1G
 
 [Install]

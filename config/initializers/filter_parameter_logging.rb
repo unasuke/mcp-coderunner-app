@@ -5,8 +5,9 @@
 # See the ActiveSupport::ParameterFilter documentation for supported notations and behaviors.
 Rails.application.config.filter_parameters += [
   :passw, :email, :secret, :token, :_key, :crypt, :salt, :certificate, :otp, :ssn, :cvv, :cvc,
-  # 同じ内容がログと DB の 2 箇所に増えるのを避ける。中身は DB と /admin で見る
+  # Keeps the same content from accumulating in both the log and the database.
+  # To read it, look at the database or /admin
   :script, :dockerfile, :content, :stdout, :stderr,
-  # 認可の途中で流れるもの
+  # What moves across the wire during authorization
   :lease_token, :client_secret, :code, :code_verifier
 ]
