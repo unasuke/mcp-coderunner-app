@@ -140,3 +140,74 @@ jobs:
           name: screenshots
           path: ${{ github.workspace }}/tmp/screenshots
           if-no-files-found: ignore
+
+  # main に入ったものだけを、上のジョブが全部通ってからデプロイする。
+  # VPS への ssh は opkssh。長命の鍵を置かず、GitHub Actions の OIDC で入る
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [ scan_ruby, lint, worker, test, system-test ]
+    runs-on: ubuntu-latest
+
+    # 同時に 2 本走らせない。走っている分は最後まで流す
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+
+    permissions:
+      contents: read
+      packages: write   # ghcr.io へ push する
+      id-token: write   # opkssh が使う OIDC トークン
+
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
+      MCP_CODERUNNER_APP_BASE_URL: ${{ secrets.MCP_CODERUNNER_APP_BASE_URL }}
+      BOOTSTRAP_ADMIN_GITHUB_LOGIN: ${{ secrets.BOOTSTRAP_ADMIN_GITHUB_LOGIN }}
+      # GITHUB_ で始まる名前の secret は作れないので、別名から移し替える
+      GITHUB_CLIENT_ID: ${{ secrets.OAUTH_GITHUB_CLIENT_ID }}
+      GITHUB_CLIENT_SECRET: ${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }}
+      # push も pull もこのジョブの寿命だけ有効なトークンで済ませる
+      KAMAL_REGISTRY_USERNAME: ${{ github.actor }}
+      KAMAL_REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Set up opkssh
+        uses: openpubkey/setup-opkssh@v2
+        with:
+          ssh-hosts-to-scan: ${{ secrets.DEPLOY_HOST }}
+
+      # Kamal は net-ssh で繋ぐ。証明書は agent 経由でないと拾われないことがあるので、
+      # opkssh が書いた鍵を明示的に読ませる
+      - name: Hand the opkssh certificate to an agent
+        run: |
+          eval "$(ssh-agent -s)"
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
+          for key in ~/.ssh/id_*; do
+            case "$key" in *.pub) continue ;; esac
+            ssh-add "$key" || true
+          done
+          ssh-add -l
+
+      # .kamal/secrets は手元の config/master.key を読む。CI には無いので置く
+      - name: Write the master key
+        run: |
+          install -m 600 /dev/null config/master.key
+          printf '%s' "${{ secrets.RAILS_MASTER_KEY }}" > config/master.key
+
+      - name: Check the resolved configuration
+        run: bin/kamal config
+
+      - name: Deploy
+        run: bin/kamal deploy

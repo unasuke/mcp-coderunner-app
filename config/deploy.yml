@@ -26,9 +26,10 @@ servers:
 
 # イメージは手元か CI でビルドして push し、サーバーは pull するだけ。
 # VPS ではビルドしない。
+# CI からは GITHUB_TOKEN を使い捨てで渡す。手元からは自分の PAT
 registry:
   server: ghcr.io
-  username: unasuke
+  username: <%= ENV.fetch("KAMAL_REGISTRY_USERNAME", "unasuke") %>
   password:
     - KAMAL_REGISTRY_PASSWORD
 
@@ -96,9 +97,9 @@ builder:
   #   - GITHUB_TOKEN
   #   - RAILS_MASTER_KEY
 
-# Use a different ssh user than root
-# ssh:
-#   user: app
+# opkssh の auth_id がどの Linux ユーザーに割り当てるかに合わせる
+ssh:
+  user: <%= ENV.fetch("DEPLOY_SSH_USER", "root") %>
 
 # Use accessory services (secrets come from .kamal/secrets).
 # accessories:

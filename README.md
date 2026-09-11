@@ -84,6 +84,38 @@ bin/kamal config     # 解決結果を確認する。デプロイ前に一度通
 bin/kamal deploy
 ```
 
+### CI からのデプロイ
+
+`main` に入って CI の全ジョブが通ると、`.github/workflows/ci.yml` の `deploy` ジョブが走る。
+VPS への ssh は [opkssh](https://github.com/openpubkey/opkssh) で、**長命の秘密鍵を CI にも VPS にも置かない**。
+GitHub Actions の OIDC トークンで入る。
+
+ghcr.io への push と VPS からの pull には `GITHUB_TOKEN` を使う。ジョブの寿命だけ有効なので、
+**VPS に残る資格情報も同じ時間で切れる**（パッケージを public にすれば pull に資格情報は要らなくなる）。
+
+必要な secret:
+
+| secret | 中身 |
+|---|---|
+| `DEPLOY_HOST` | VPS のアドレス |
+| `DEPLOY_SSH_USER` | ssh の接続先ユーザー（未設定なら `root`） |
+| `MCP_CODERUNNER_APP_BASE_URL` | 公開 URL |
+| `OAUTH_GITHUB_CLIENT_ID` / `OAUTH_GITHUB_CLIENT_SECRET` | GitHub ログイン。**`GITHUB_` で始まる名前の secret は作れない**ので別名で置き、ワークフローで移し替える |
+| `BOOTSTRAP_ADMIN_GITHUB_LOGIN` | 最初のログインで admin になるログイン名 |
+| `RAILS_MASTER_KEY` | `config/master.key` の中身 |
+
+VPS 側は opkssh を入れて、GitHub Actions を発行者として許可する。
+
+```
+# /etc/opk/providers
+https://token.actions.githubusercontent.com github oidc
+
+# /etc/opk/auth_id  （<ログインさせる Linux ユーザー> <主体> <発行者>）
+root repo:unasuke/mcp-coderunner-app:ref:refs/heads/main https://token.actions.githubusercontent.com
+```
+
+`main` のワークフローからしか入れない。ブランチやフォークの CI は主体が一致しないので弾かれる。
+
 リポジトリを public にしたらパッケージも public にしてよい。イメージの中身は
 公開済みのソースなので隠す意味がなく、public にすればサーバー側は資格情報なしで
 pull できる。
