@@ -129,6 +129,38 @@ class AdminTest < ActionDispatch::IntegrationTest
     assert_equal "queued", job.reload.state
   end
 
+  # digest を指定すれば未承認の実行環境でもジョブは作れる。そこから実行へ進む
+  # 経路を塞いでおかないと、Dockerfile を読まずに走らせられる
+  test "a job on an unapproved blueprint cannot be approved" do
+    sign_in
+    job = Job.create!(blueprint: @blueprint, script: "puts 1", profile: "default")
+
+    post approve_admin_job_path(job)
+
+    assert_equal "pending_review", job.reload.state
+    assert_match(/実行環境/, flash[:alert])
+  end
+
+  test "a job on a revoked blueprint cannot be approved either" do
+    sign_in
+    @blueprint.update!(state: :revoked)
+    job = Job.create!(blueprint: @blueprint, script: "puts 1", profile: "default")
+
+    post approve_admin_job_path(job)
+
+    assert_equal "pending_review", job.reload.state
+  end
+
+  # 承認できない状態でも却下はできる。溜めたままにしない
+  test "a job on an unapproved blueprint can still be rejected" do
+    sign_in
+    job = Job.create!(blueprint: @blueprint, script: "puts 1", profile: "default")
+
+    post reject_admin_job_path(job)
+
+    assert_equal "rejected", job.reload.state
+  end
+
   # queued はその場で finished（cancelled）にする。ワーカーは関与しない
   test "cancelling a queued job finishes it immediately" do
     sign_in
