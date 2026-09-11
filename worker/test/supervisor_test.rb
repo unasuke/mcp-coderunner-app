@@ -11,7 +11,7 @@ class SupervisorTest < Minitest::Test
   end
 
   def test_supervisor_kill_wins_over_everything
-    # タイムアウトで SIGKILL した直後にメモリ圧が出ていると OOM と誤って記録されうる
+    # Memory pressure right after a timeout's SIGKILL would otherwise be recorded as an OOM
     state = { "OOMKilled" => true, "ExitCode" => 137 }
 
     assert_equal "timeout", reason(state:, killed_by: :timeout, stats: Stats.new(oom_kills: 1, pids_max_events: 0))
@@ -22,7 +22,7 @@ class SupervisorTest < Minitest::Test
     assert_equal "oom_killed", reason(state: { "OOMKilled" => true, "ExitCode" => 137 })
   end
 
-  # 子プロセスだけが OOM で殺されるとコンテナは生き残り、State.OOMKilled は false になる
+  # When only a child is OOM-killed the container survives, and State.OOMKilled reads false
   def test_oom_from_cgroup_when_docker_state_is_false
     state = { "OOMKilled" => false, "ExitCode" => 1 }
 

@@ -9,11 +9,10 @@ require "protocol/job_payload"
 require "worker/errors"
 
 module Worker
-  # VPS への HTTP。すべてワーカー発で、/api/worker/v1 配下。
+  # HTTP to the VPS. Every call starts here, and they all live under /api/worker/v1.
   #
-  # スレッドセーフではない。接続を 1 本使い回すので、lease のロングポーリングで
-  # 25 秒塞がっているあいだ heartbeat が打てなくなる。bin/worker は用途ごとに
-  # 別のインスタンスを持つ。
+  # Not thread-safe. One connection is reused, so while /lease is holding it for 25
+  # seconds no heartbeat can go out. bin/worker keeps a separate instance per use.
   class Client
     ConnectionError = Class.new(Error)
     Unauthorized = Class.new(Error)
@@ -54,7 +53,7 @@ module Worker
       post("/deregister", { instance_id:, reason: })
     end
 
-    # ジョブが無ければ nil（204）。protocol_version が合わなければ ProtocolMismatch
+    # nil when there is no job (204). ProtocolMismatch when protocol_version disagrees
     def lease(instance_id:)
       body = post("/lease", {
         instance_id:,
@@ -69,8 +68,9 @@ module Worker
       post("/jobs/#{job_id}/heartbeat", { lease_token: })
     end
 
-    # lease が失効していたらサーバーは 409 を返す。二重実行の結果で上書きされるのを防ぐため。
-    # 409 を受けたら再送しない。そのジョブは既に別の試行が担当している。
+    # The server answers 409 when the lease has expired, which is what keeps the
+    # result of a double run from overwriting the real one. Do not resend after a
+    # 409: another attempt owns that job now.
     def post_result(job_id:, lease_token:, result:)
       post("/jobs/#{job_id}/result", result.to_h.merge("lease_token" => lease_token))
       true
@@ -131,7 +131,8 @@ module Worker
         h.verify_mode = OpenSSL::SSL::VERIFY_PEER
         h.open_timeout = 10
         h.write_timeout = 10
-        # /lease は最大 LEASE_WAIT 秒返らない。暗黙の既定値に頼ると窓を伸ばしたときに壊れる
+        # /lease can stay silent for LEASE_WAIT seconds. Leaning on the implicit
+        # default would break the moment that window grows
         h.read_timeout = Protocol::Constants::LEASE_WAIT + 10
         h.keep_alive_timeout = 30
         h.max_retries = 0

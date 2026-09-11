@@ -3,10 +3,10 @@ worker_id: home-vm-01
 endpoint: https://mcp-coderunner-app.example.com
 token_file: /etc/mcp-coderunner-app/token
 
-# ジョブごとの作業ディレクトリ。systemd の RuntimeDirectory= と揃える
+# The per-job working directory. Keep it in step with systemd's RuntimeDirectory=
 runtime_dir: /run/mcp-coderunner-app
 
-# ワーカー側の正。VPS から来た値がこれを超えていたら切り詰めて実行する
+# The worker's own source of truth. Anything from the VPS above these is trimmed, then run
 limits:
   max_memory_mb: 4096
   max_cpus: 4

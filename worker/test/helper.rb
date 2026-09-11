@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# ワーカーのテストは Rails を読まない。stdlib の minitest だけで走らせる。
+# The worker's tests do not load Rails. They run on stdlib minitest alone.
 #   ruby -Ilib -I. worker/test/policy_test.rb
 
 require "minitest/autorun"

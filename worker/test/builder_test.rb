@@ -24,7 +24,7 @@ class BuilderTest < Minitest::Test
     end
   end
 
-  # 展開する側ではなく、書き出す側で弾く。build フェーズは root で走る
+  # Refused where the files are written, not where they are unpacked. The build phase runs as root
   def test_refuses_to_write_outside_the_context
     Dir.mktmpdir do |dir|
       files = [ Protocol::JobPayload::ContextFile.new(path: "../escaped", content: "x", executable: false) ]

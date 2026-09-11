@@ -1,44 +1,44 @@
 # frozen_string_literal: true
 
 module Protocol
-  # Rails 側とワーカー側の両方が知っていないと噛み合わなくなる値。
-  # 片方だけ変えると壊れるので、1 箇所にしか書かない。
+  # Values both the Rails side and the worker side have to agree on. Changing
+  # one side alone breaks the pair, so they are written in exactly one place.
   module Constants
-    # lease / result のワイヤーフォーマットを変えたときだけ上げる
+    # Bumped only when the wire format of lease / result changes
     PROTOCOL_VERSION = 1
 
-    # /lease のロングポーリングの窓（秒）。ワーカーの read_timeout はこれより長くする
+    # The long-polling window of /lease, in seconds. The worker's read_timeout must exceed it
     LEASE_WAIT = 25
 
-    # worker heartbeat と job heartbeat の間隔（秒）
+    # Interval of the worker heartbeat and the job heartbeat, in seconds
     HEARTBEAT_INTERVAL = 30
 
-    # /lease のロングポーリングの中で queued を探す間隔（秒）。
-    # ここを詰めるほど enqueue から実行開始までが速くなるが、そのぶん
-    # 空振りの問い合わせと last_heartbeat_at の更新が増える
+    # How often /lease looks for a queued job while long-polling, in seconds.
+    # Shortening it gets a job moving sooner after it is enqueued, at the cost
+    # of more empty queries and more writes to last_heartbeat_at
     LEASE_POLL_INTERVAL = 3
 
-    # この時間 heartbeat が無い instance は死んだとみなす（秒）。間隔の 4 倍
+    # An instance silent for this long is considered dead, in seconds. Four times the interval
     HEARTBEAT_EXPIRY = 120
 
-    # lease_expires_at を何秒先に置くか。job heartbeat のたびに更新される
+    # How far ahead lease_expires_at is set, in seconds. Pushed out on every job heartbeat
     LEASE_TTL = 120
 
-    # leases の本数がこれ以上になったら再試行しない
+    # Once this many leases exist for a job, it is not retried again
     MAX_ATTEMPTS = 2
 
-    # 実行コンテナ内での script の置き場所
+    # Where the script is placed inside the job container
     SCRIPT_PATH = "/work/script.rb"
 
     DEFAULT_ENTRYPOINT = [ "ruby", SCRIPT_PATH ].freeze
 
-    # 孤児コンテナを回収するための目印
+    # The mark that lets orphaned containers be swept up
     CONTAINER_LABEL = "mcp-coderunner-app.job"
 
-    # ビルドしたイメージのタグ。digest をそのままタグにする
+    # The repository for built images. The digest is used verbatim as the tag
     IMAGE_REPO = "mcp-coderunner-app/bp"
 
-    # /deregister の理由
+    # The reasons /deregister accepts
     DEREGISTER_REASONS = %w[ shutdown update drained ].freeze
   end
 end

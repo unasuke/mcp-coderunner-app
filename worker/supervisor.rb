@@ -3,10 +3,10 @@
 require "worker/docker"
 
 module Worker
-  # 壁時計のタイムアウトと中断を見張り、終了理由を決める。
+  # Watches the wall clock and the cancel flag, and decides how a job ended.
   #
-  # Ruby はシグナルを握り潰せるので docker stop だけでは足りない。
-  # SIGTERM を送って猶予を与え、それでも残っていたら kill する。
+  # Ruby can swallow a signal, so docker stop alone is not enough. Send SIGTERM,
+  # give it a moment, and kill whatever is still standing.
   class Supervisor
     POLL_INTERVAL = 0.2
     STOP_GRACE = 5
@@ -27,7 +27,7 @@ module Worker
       @killed_by = nil
     end
 
-    # コンテナが終わるまで待つ。戻り値は :exited / :timeout / :cancelled
+    # Waits for the container to finish. Returns :exited, :timeout or :cancelled
     def wait
       deadline = monotonic + @timeout_s
 
@@ -62,8 +62,9 @@ module Worker
       Docker.run("kill", @container) if running?
     end
 
-    # 判定の順序が意味を持つ。supervisor が殺したことを最優先にする。
-    # タイムアウトで SIGKILL した直後にメモリ圧が出ていると、OOM と誤って記録されうる。
+    # The order of these checks carries meaning: what the supervisor did comes
+    # first. Memory pressure right after a timeout's SIGKILL would otherwise be
+    # recorded as an OOM that never happened.
     def self.termination_reason(state:, killed_by: nil, stats: nil)
       return "timeout" if killed_by == :timeout
       return "cancelled" if killed_by == :cancelled
@@ -80,8 +81,9 @@ module Worker
       end
     end
 
-    # cgroup の経路に乗らないので stderr からの推定になる。
-    # 確度が落ちるぶん、判定できなければ exited に倒して無理に disk_full を名乗らない。
+    # Nothing about this reaches the cgroup, so it is inferred from stderr. Being
+    # the less certain signal, an undecided case falls back to exited rather than
+    # claiming disk_full.
     def self.disk_full?(stderr)
       return false if stderr.nil? || stderr.empty?
 

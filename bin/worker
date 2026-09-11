@@ -1,8 +1,9 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# 自宅 VM で動かす常駐プロセス。systemd から起動する。
-# 単発実行のサブコマンドは持たない。手で叩きたいときは MCP エンドポイント経由で投げる。
+# The long-running process on the home VM, started by systemd.
+# It has no one-shot subcommands. To run something by hand, send it through the
+# MCP endpoint like anything else.
 
 root = File.expand_path("..", __dir__)
 $LOAD_PATH.unshift(File.join(root, "lib"), root)
@@ -25,7 +26,7 @@ module Worker
     DEFAULT_REVISION = "/opt/mcp-coderunner-app/REVISION"
     BACKOFF_MAX = 30
 
-    # 実行中のジョブを待つ上限。unit の TimeoutStopSec=90 の内側に収める
+    # How long to wait on jobs in flight. Stays inside the unit's TimeoutStopSec=90
     SHUTDOWN_GRACE = 60
 
     def initialize(config_path:, revision_path:)
@@ -45,9 +46,9 @@ module Worker
       heartbeat = start_heartbeat
       lease_loop
 
-      # 終了の順序は「新規 lease を止める → 実行中のコンテナを片付ける →
-      # /deregister」。コンテナを落とす前に離脱を通知すると、サーバーが再投入した
-      # ジョブと古いコンテナが並走する
+      # Shutdown order: stop taking leases, clear the containers still running,
+      # then /deregister. Announcing the departure before the containers are down
+      # leaves the job the server requeues running alongside the old container
       drain_jobs
       stop_heartbeat(heartbeat)
       deregister
@@ -57,15 +58,15 @@ module Worker
 
     private
 
-    # trap の中では flag を立てるだけにする。ロックを取ると止まりうる
+    # Inside a trap, only set a flag. Taking a lock here can deadlock
     def trap_signals
       %w[ TERM INT ].each do |signal|
         Signal.trap(signal) { @leasing = false }
       end
     end
 
-    # サーバーがまだ起きていないことがある（bin/dev で並べて起動する場合など）。
-    # 落ちて再起動を待つより、繋がるまで待つほうが素直。
+    # The server may not be up yet (when bin/dev starts both at once, say).
+    # Waiting until it answers is more honest than dying and waiting to be restarted.
     def register
       backoff = 1
 
@@ -94,12 +95,12 @@ module Worker
       @client.deregister(instance_id: @instance_id, reason: "shutdown")
       log("deregister", instance_id: @instance_id)
     rescue Error => e
-      # ベストエフォート。届かなければ heartbeat の失効判定が拾う
+      # Best-effort. If it never lands, heartbeat expiry picks it up
       log("deregister.failed", error: e.message)
     end
 
-    # 停止処理のあいだも打ち続ける。90 秒の片付け中に reaper に拾われないように、
-    # deregister の直前まで止めない
+    # Keeps beating through shutdown. So the reaper does not claim this instance
+    # during a 90-second cleanup, it runs until just before deregister
     def start_heartbeat
       Thread.new do
         client = Client.new(policy: @policy)
@@ -138,7 +139,7 @@ module Worker
           backoff = 1
           start_job(payload) if payload
         rescue Client::ProtocolMismatch => e
-          # 勝手に exit するとクラッシュループになる。止めるだけにする
+          # Exiting on our own would make a crash loop. Just stop taking work
           log("lease.protocol_mismatch", error: e.message)
           @draining = true
         rescue Error => e
@@ -165,7 +166,7 @@ module Worker
       log("job.start", job_id: payload.job_id, lease_id: payload.lease_id,
         digest: payload.blueprint.digest, profile: payload.profile)
 
-      # heartbeat と結果の送信で接続を共有しない。Client はスレッドセーフではない
+      # The heartbeat and the result do not share a connection. Client is not thread-safe
       heartbeat_client = Client.new(policy: @policy)
       heartbeat = start_job_heartbeat(entry, heartbeat_client)
       result_client = Client.new(policy: @policy)
@@ -173,7 +174,7 @@ module Worker
       await_exclusive_slot(entry)
       result = Runner.new(policy: @policy).call(payload, cancelled: -> { entry.cancelled? })
 
-      # Thread#kill しない。送信の途中でソケットを壊すと結果が返らない
+      # No Thread#kill. Breaking the socket mid-send means the result never arrives
       entry.stop_heartbeat!
       heartbeat.join(5)
 
@@ -183,7 +184,7 @@ module Worker
       log("job.finish", job_id: payload.job_id, reason: result.termination_reason,
         exit_code: result.exit_code, duration_ms: result.duration_ms, accepted:)
     rescue StandardError => e
-      # 結果を返さずに終わると、リースが失効するまでジョブが宙吊りになる
+      # Finishing without sending a result leaves the job hanging until the lease expires
       log("job.failed", job_id: payload.job_id, error: "#{e.class}: #{e.message}")
       report_worker_error(result_client, payload, e)
     ensure
@@ -193,8 +194,8 @@ module Worker
       @jobs.delete(payload.lease_id)
     end
 
-    # bench は他のジョブと同時に走らせない。サーバー側でも止めているが、
-    # VPS の状態がずれても測定が壊れないようにここでも待つ
+    # bench never runs alongside another job. The server holds this too, but
+    # waiting here as well keeps a drifted VPS from ruining the measurement
     def await_exclusive_slot(entry)
       return unless entry.exclusive?
 
@@ -204,7 +205,7 @@ module Worker
       end
     end
 
-    # 最初の 1 回はすぐ打つ。サーバーはこれを受け取って state を running に移す。
+    # The first beat goes out immediately: it is what moves the server-side state to running.
     def start_job_heartbeat(entry, client)
       Thread.new do
         while entry.beating?
@@ -237,7 +238,7 @@ module Worker
       log("job.result.failed", job_id: payload.job_id, error: "#{e.class}: #{e.message}")
     end
 
-    # SIGTERM を受けたら、実行中のコンテナを落としてからでないと離脱できない
+    # After SIGTERM, leaving is only allowed once the running containers are down
     def drain_jobs
       entries = @jobs.entries
       return if entries.empty?
@@ -251,7 +252,8 @@ module Worker
       sweep_containers
     end
 
-    # 待っても終わらなかった分を label で片付ける。unit の起動前・停止後の掃除と同じ
+    # Whatever outlasted the wait is cleared by label, the same sweep the unit runs
+    # before it starts and after it stops
     def sweep_containers
       listed = Docker.run("ps", "-aq", "--filter", "label=#{Protocol::Constants::CONTAINER_LABEL}")
       containers = listed.stdout.split
@@ -261,7 +263,7 @@ module Worker
       Docker.run("rm", "--force", "--volumes", *containers)
     end
 
-    # 眠っているあいだも停止に気づけるように、細かく刻む
+    # Sleep in small pieces, so a shutdown is noticed while napping
     def nap(seconds)
       seconds.times do
         break unless yield
@@ -279,8 +281,8 @@ module Worker
       result.success? ? result.stdout.strip : nil
     end
 
-    # 空のファイルや読めないパスでも register は通す。ずれの検知が効かなくなるだけで、
-    # ワーカーが起動できないほどのことではない
+    # An empty file or an unreadable path still registers. All that is lost is
+    # drift detection, which is not worth refusing to start over
     def read_revision(path)
       revision = File.read(path).strip
       revision.empty? ? "unknown" : revision
@@ -298,8 +300,8 @@ end
 options = { config: Worker::Agent::DEFAULT_CONFIG, revision: Worker::Agent::DEFAULT_REVISION }
 OptionParser.new do |parser|
   parser.banner = "Usage: bin/worker [options]"
-  parser.on("--config PATH", "設定ファイル（既定: #{options[:config]}）") { |v| options[:config] = v }
-  parser.on("--revision PATH", "REVISION ファイル（既定: #{options[:revision]}）") { |v| options[:revision] = v }
+  parser.on("--config PATH", "config file (default: #{options[:config]})") { |v| options[:config] = v }
+  parser.on("--revision PATH", "REVISION file (default: #{options[:revision]})") { |v| options[:revision] = v }
 end.parse!(ARGV)
 
 exit Worker::Agent.new(config_path: options[:config], revision_path: options[:revision]).run

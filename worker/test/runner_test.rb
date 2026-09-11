@@ -32,8 +32,8 @@ class RunnerTest < Minitest::Test
     assert_equal "core=0", pair(list, "--ulimit")
   end
 
-  # 承認済み Blueprint 上の script はレビューされない。出力でホストのディスクを
-  # 埋められないように docker 側にも上限を置く
+  # A script running on an approved Blueprint is not itself reviewed, so docker
+  # holds a ceiling of its own to keep output from filling the host's disk
   def test_limits_the_container_log
     list = args
 
@@ -42,12 +42,12 @@ class RunnerTest < Minitest::Test
     assert_includes list, "max-file=2"
   end
 
-  # --rm を付けると終了と同時にコンテナが消えて State.OOMKilled を読めない
+  # With --rm the container disappears as it exits, taking State.OOMKilled with it
   def test_does_not_remove_the_container_automatically
     refute_includes args, "--rm"
   end
 
-  # uid 1000 を持たないイメージ（ruby 公式がそう）で軒並み失敗するので指定しない
+  # Not set: it fails across the board on images without uid 1000, the official ruby ones included
   def test_does_not_pin_the_user
     refute_includes args, "--user"
   end
@@ -85,7 +85,7 @@ class RunnerTest < Minitest::Test
     assert_equal "mcp-coderunner-app/bp:#{payload.blueprint.digest}", list[list.index("ruby") - 1]
   end
 
-  # bench は cpuset でピン留めして他のジョブと排他にする
+  # bench gets pinned to a cpuset, which is how it stays exclusive of other jobs
   def test_bench_pins_cpus
     payload = build_payload(profile: "bench",
       limits: { "memory_mb" => 4096, "cpus" => 4, "pids" => 1024, "timeout_s" => 300, "tmpfs_mb" => 1024 })
@@ -100,7 +100,7 @@ class RunnerTest < Minitest::Test
     refute_includes args, "--cpuset-cpus"
   end
 
-  # ワーカーのバグで例外が漏れても、結果は必ず返す
+  # Even when a bug in the worker lets an exception out, a result always goes back
   def test_unexpected_errors_come_back_as_worker_error
     builder = Object.new
     def builder.ensure_image!(**) = raise(TypeError, "boom")
@@ -112,12 +112,12 @@ class RunnerTest < Minitest::Test
     assert_includes result.stderr, "TypeError: boom"
   end
 
-  # ローカルに無いタグは失敗させる。Hub から同名のイメージを引かせない
+  # Fail on a tag that is not already local, rather than pulling a same-named image from the Hub
   def test_never_pulls
     assert_equal "never", pair(args, "--pull")
   end
 
-  # digest は承認の単位。中身から計算し直して一致しなければ実行しない
+  # The digest is the unit approval is granted in. Recompute it from the content; a mismatch does not run
   def test_rejects_a_digest_that_does_not_match_the_context
     payload = build_payload(digest: "b" * 64)
 
@@ -135,7 +135,7 @@ class RunnerTest < Minitest::Test
     assert_equal "policy_rejected", result.termination_reason
   end
 
-  # VPS から来た識別子をそのままパスとコンテナ名に使うので、形を確かめてから使う
+  # Identifiers from the VPS go straight into a path and a container name, so check their shape first
   def test_rejects_identifiers_that_are_not_numeric
     payload = build_payload
     payload.instance_variable_set(:@job_id, "../../etc")

@@ -1,9 +1,10 @@
 # frozen_string_literal: true
 
-# 実際に docker を回す唯一のテスト。MCP_CODERUNNER_APP_E2E=1 のときだけ走る。
+# The only test that actually drives docker. Runs only under MCP_CODERUNNER_APP_E2E=1.
 #
-# 1 本に絞るのは遅いからだけではなく、壊れたときに原因が 1 箇所に絞れる粒度を保つため。
-# 見ているのは 2 つ、--network none が効いていることと、cgroup から統計が取れること。
+# Keeping it to one is not only about how slow it is: it holds the grain at which a
+# failure still points at one place. It watches two things -- that --network none
+# holds, and that statistics come back from the cgroup.
 
 require_relative "helper"
 require "worker/runner"
@@ -36,9 +37,9 @@ class E2eTest < Minitest::Test
       assert_equal "exited", result.termination_reason, result.stderr
       assert_equal 0, result.exit_code
       assert_includes result.stdout, "hello from the container"
-      # --network none は例外なし
+      # --network none, no exceptions
       assert_includes result.stdout, "network unreachable"
-      # cgroup から統計が取れている
+      # statistics came back from the cgroup
       refute_nil result.cpu_time_ms
       refute_nil result.max_rss_bytes
       assert_operator result.max_rss_bytes, :>, 0

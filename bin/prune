@@ -1,8 +1,8 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# ビルド済みイメージの掃除。systemd の mcp-coderunner-app-prune.timer から呼ぶ。
-# ruby-head を毎晩引くなら特に必要になる。
+# Clears out built images. Called from systemd's mcp-coderunner-app-prune.timer.
+# Worth having if you pull ruby-head nightly.
 
 root = File.expand_path("..", __dir__)
 $LOAD_PATH.unshift(File.join(root, "lib"), root)
@@ -14,7 +14,7 @@ require "worker/policy"
 options = { config: "/etc/mcp-coderunner-app/config.yml" }
 OptionParser.new do |parser|
   parser.banner = "Usage: bin/prune [options]"
-  parser.on("--config PATH", "設定ファイル（既定: #{options[:config]}）") { |v| options[:config] = v }
+  parser.on("--config PATH", "config file (default: #{options[:config]})") { |v| options[:config] = v }
 end.parse!(ARGV)
 
 policy = Worker::Policy.load(options[:config])

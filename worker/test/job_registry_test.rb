@@ -24,7 +24,7 @@ class JobRegistryTest < Minitest::Test
     assert_equal 2, @registry.size
   end
 
-  # サーバーは保持中のリースを 1 本に保証しているが、ワーカーは VPS を信用しない
+  # The server guarantees a single held lease, but the worker does not take the VPS at its word
   def test_refuses_a_second_lease_for_a_running_job
     @registry.add(payload(job_id: 1, lease_id: 1))
 
@@ -40,7 +40,7 @@ class JobRegistryTest < Minitest::Test
     assert @registry.add(payload(job_id: 1, lease_id: 2))
   end
 
-  # bench を抱えているあいだは max_concurrency を無視して新規 lease を止める
+  # While a bench job is held, no new lease is taken regardless of max_concurrency
   def test_an_exclusive_job_makes_the_worker_busy_on_its_own
     @registry.add(payload(job_id: 1, lease_id: 1, profile: "bench"))
 
@@ -53,7 +53,7 @@ class JobRegistryTest < Minitest::Test
     refute_predicate @registry, :busy?
   end
 
-  # 排他ジョブは、ほかが捌けるまで走り出さない
+  # An exclusive job does not start until everything else has drained
   def test_alone_is_false_while_another_job_runs
     other = @registry.add(payload(job_id: 1, lease_id: 1))
     bench = @registry.add(payload(job_id: 2, lease_id: 2, profile: "bench"))

@@ -15,7 +15,7 @@ class CgroupStatsTest < Minitest::Test
     assert_equal 3, stats.pids_max_events
   end
 
-  # memory.peak が無いカーネルでは memory.current のポーリング最大値で代用する
+  # On a kernel without memory.peak, the highest memory.current seen while polling stands in
   def test_falls_back_to_memory_current
     Dir.mktmpdir do |dir|
       File.write(File.join(dir, "memory.current"), "12345\n")
@@ -39,7 +39,7 @@ class CgroupStatsTest < Minitest::Test
     end
   end
 
-  # 統計が取れないことは実行の失敗ではない。全部 best-effort に読む
+  # Failing to measure a run is not the same as the run failing. Every read is best-effort
   def test_missing_files_are_ignored
     Dir.mktmpdir do |dir|
       stats = Worker::CgroupStats.new(1, base: dir).sample
@@ -54,7 +54,7 @@ class CgroupStatsTest < Minitest::Test
     assert_nil Worker::CgroupStats.resolve_base(999_999_999)
   end
 
-  # コンテナが即座に終わると /proc から消える。そこで落ちるとジョブが宙吊りになる
+  # A container that ends at once is already gone from /proc. Dying here would leave the job hanging
   def test_start_and_stop_are_safe_without_a_resolvable_cgroup
     stats = Worker::CgroupStats.new(999_999_999)
 

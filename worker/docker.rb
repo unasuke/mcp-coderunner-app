@@ -4,8 +4,9 @@ require "open3"
 require "worker/errors"
 
 module Worker
-  # docker CLI の薄いラッパ。Builder / Runner / Supervisor が共有する。
-  # docker API を直接叩かないのは、VM 側に載せる依存を増やさないため（stdlib だけで書く）。
+  # A thin wrapper over the docker CLI, shared by Builder, Runner and Supervisor.
+  # It does not speak to the docker API directly, to avoid adding a dependency to
+  # what the VM has to carry (this side is written against stdlib alone).
   module Docker
     Result = Data.define(:stdout, :stderr, :status) do
       def success? = status.success?

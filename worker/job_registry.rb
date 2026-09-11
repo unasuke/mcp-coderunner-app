@@ -3,12 +3,13 @@
 require "protocol/resource_profile"
 
 module Worker
-  # 実行中のジョブの台帳。どのスレッドから触っても同じ答えを返す。
+  # The ledger of jobs in flight. It answers the same from any thread.
   #
-  # bench の排他はサーバーとワーカーの両方で持つ。サーバー側だけに置くと、
-  # VPS の状態がずれたときに 2 本同時に走り、測定値が静かに壊れる。
+  # Exclusivity for bench is held on both the server and the worker. On the server
+  # alone, a VPS whose state has drifted would let two run at once and quietly
+  # ruin the measurement.
   class JobRegistry
-    # 実行中のジョブ 1 件。フラグはスレッドをまたいで読む
+    # One job in flight. Its flags are read from other threads
     class Entry
       attr_reader :payload
       attr_accessor :thread
@@ -39,9 +40,10 @@ module Worker
       @mutex = Mutex.new
     end
 
-    # 受け入れたら Entry、断ったら nil。
-    # 同じ job_id が走っているときは断る。サーバー側は保持中のリースを 1 本に
-    # 保証しているが、ワーカーは VPS を信用しないので実行中の行を上書きしない。
+    # An Entry when accepted, nil when turned away.
+    # A job_id already running is turned away. The server guarantees only one lease
+    # is held at a time, but the worker does not take the VPS at its word and will
+    # not overwrite a row that is running.
     def add(payload)
       @mutex.synchronize do
         return nil if @entries.size >= @max_concurrency
@@ -67,14 +69,14 @@ module Worker
       size.zero?
     end
 
-    # 排他ジョブを抱えているあいだは新しい lease を取らない（max_concurrency を無視する）
+    # While an exclusive job is held, take no new lease regardless of max_concurrency
     def busy?
       @mutex.synchronize do
         @entries.size >= @max_concurrency || @entries.values.any?(&:exclusive?)
       end
     end
 
-    # 排他ジョブが走り出してよいか。自分以外が捌けるまで待つ
+    # Whether an exclusive job may start. It waits until everything else has drained
     def alone?(entry)
       @mutex.synchronize { @entries.values.all? { |other| other.equal?(entry) } }
     end

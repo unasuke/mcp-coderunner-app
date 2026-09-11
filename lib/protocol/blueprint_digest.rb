@@ -4,14 +4,15 @@ require "digest"
 require "json"
 
 module Protocol
-  # Blueprint の内容ハッシュ。承認はこの値に紐づくので、計算方法を一意に固定する。
+  # The content hash of a Blueprint. Approval is bound to this value, so how it
+  # is computed is pinned down to exactly one answer.
   #
-  # - キーの順序は下のリテラルの順（JSON.generate は挿入順で出す）
-  # - files は path の昇順。入力の順番に依存させない
-  # - content は改行も含めてそのまま。末尾改行の有無で digest は変わる
-  # - name と summary は含めない。名前や説明を変えただけで再レビューにしない
+  # - Key order is the order of the literal below (JSON.generate emits insertion order)
+  # - files are sorted by path ascending, so input order does not matter
+  # - content is taken as-is, newlines included. A trailing newline changes the digest
+  # - name and summary are left out. Renaming or rewording does not force another review
   module BlueprintDigest
-    # files: [{ path:, content:, executable: }] （文字列キーでも可）
+    # files: [{ path:, content:, executable: }] (string keys are accepted too)
     def self.compute(dockerfile:, files:)
       payload = {
         "dockerfile" => dockerfile,

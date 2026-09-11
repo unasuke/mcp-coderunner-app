@@ -8,10 +8,11 @@ require "worker/docker"
 require "worker/errors"
 
 module Worker
-  # Blueprint から実行用のイメージを作る。タグは digest そのもの。
+  # Builds the image a job runs in, out of a Blueprint. The tag is the digest itself.
   #
-  # 同じ digest のイメージが既にあれば何もしない。これで bundle install が
-  # 毎回走る問題は消える。BuildKit のレイヤキャッシュもそのまま効く。
+  # If an image with that digest is already here, this does nothing -- which is what
+  # keeps bundle install from running on every job. BuildKit's layer cache still
+  # works the way it always does.
   class Builder
     STDERR_TAIL_BYTES = 8192
 
@@ -45,7 +46,8 @@ module Worker
       end
     end
 
-    # cache_ttl_days と max_images で自前管理する。ruby-head を毎晩引くなら特に必要。
+    # Kept in hand with cache_ttl_days and max_images. Worth having if you pull
+    # ruby-head nightly.
     def prune!(now: Time.now)
       images = list_images
       expired = images.select { |image| image.fetch(:created_at) < now - (@policy.cache_ttl_days * 86_400) }
@@ -73,8 +75,9 @@ module Worker
 
     private
 
-    # blueprint_files は mode を持たない。必要な区別は実行可能かどうかだけで、
-    # 任意の mode を許すと setuid / setgid まで通る。build フェーズは root で走る。
+    # blueprint_files carry no mode. The only distinction worth having is whether a
+    # file is executable, and allowing an arbitrary mode would let setuid / setgid
+    # through as well. The build phase runs as root.
     def write_context(dir, dockerfile, files)
       File.write(File.join(dir, "Dockerfile"), dockerfile)
 
@@ -86,8 +89,8 @@ module Worker
       end
     end
 
-    # Runner が Policy で弾いているが、書き出す側でも確かめる。
-    # build フェーズは root で走るので、ここを抜けられると影響が大きい。
+    # Runner already refuses these through Policy, but check again where the write
+    # happens. The build phase runs as root, so getting past this one matters.
     def resolve_within(dir, path)
       base = File.realpath(dir)
       resolved = File.expand_path(path, base)

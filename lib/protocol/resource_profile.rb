@@ -1,8 +1,10 @@
 # frozen_string_literal: true
 
 module Protocol
-  # 名前付きのリソースプロファイル。数値を自由に指定させず、ここにある組み合わせだけを許す。
-  # Rails 側は submit_job の検証と lease で送る具体値に、ワーカー側は clamp の入力に使う。
+  # Named resource profiles. Callers do not get to name numbers; only the
+  # combinations listed here are allowed. Rails uses them to validate submit_job
+  # and to fill in the concrete values it sends with a lease; the worker uses
+  # them as the input to its own clamp.
   module ResourceProfile
     ALL = {
       "default" => {
@@ -19,7 +21,8 @@ module Protocol
 
     DEFAULT = "default"
 
-    # lease で送る limits。exclusive / requires_approval はサーバー側の判断材料なので含めない
+    # The limits sent with a lease. exclusive and requires_approval are the server's
+    # own business, so they stay out of it
     LIMIT_KEYS = %i[ memory_mb cpus pids timeout_s tmpfs_mb ].freeze
 
     def self.exist?(name)

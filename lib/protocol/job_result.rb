@@ -1,27 +1,27 @@
 # frozen_string_literal: true
 
 module Protocol
-  # POST /jobs/:id/result のペイロード。そのまま job_results の 1 行になる。
+  # The payload of POST /jobs/:id/result. It becomes one row of job_results as-is.
   #
-  # termination_reason を構造化して返すのは、原因が分からないと同じジョブを
-  # 条件を変えずに投げ直すことになるため。
+  # termination_reason is structured rather than prose because without knowing why
+  # a job ended, the only move left is to submit the same job again unchanged.
   class JobResult
     Invalid = Class.new(StandardError)
 
     REASONS = [
-      "exited",             # 正常終了（exit_code を見る）
-      "timeout",            # 壁時計超過。SIGKILL された
-      "oom_killed",         # State.OOMKilled か cgroup の oom_kill
-      "pids_exceeded",      # pids.events の max が立った
-      "disk_full",          # stderr からの推定
+      "exited",             # ran to completion (read exit_code)
+      "timeout",            # went past the wall clock and was SIGKILLed
+      "oom_killed",         # State.OOMKilled, or oom_kill from the cgroup
+      "pids_exceeded",      # the max counter in pids.events moved
+      "disk_full",          # inferred from stderr
       "image_build_failed",
-      "policy_rejected",    # ワーカーの検証 / clamp に弾かれた
-      "worker_error",       # docker 自体の失敗、ワーカーのバグ
-      "lease_expired",      # ワーカーが応答しなくなった
-      "cancelled"           # UI から中断された
+      "policy_rejected",    # turned away by the worker's own validation or clamp
+      "worker_error",       # docker itself failed, or the worker has a bug
+      "lease_expired",      # the worker stopped answering
+      "cancelled"           # stopped from the UI
     ].freeze
 
-    # コンテナが走っていないので実行系の統計を持たない終了理由
+    # Reasons that carry no runtime statistics, because no container ever ran
     REASONS_WITHOUT_CONTAINER = %w[ image_build_failed policy_rejected worker_error lease_expired ].freeze
 
     attr_reader :termination_reason, :exit_code, :stdout, :stderr, :truncated,

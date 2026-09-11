@@ -5,8 +5,9 @@ require "protocol/constants"
 require "worker/errors"
 
 module Worker
-  # ワーカー側の正。VPS から来た値は必ずここで再評価する。
-  # 超えていたら拒否ではなく切り詰め、実際に適用した値を applied_limits として返す。
+  # The worker's own source of truth. Anything the VPS asks for is re-evaluated
+  # here. Over the line it is trimmed rather than refused, and what was actually
+  # applied comes back as applied_limits.
   class Policy
     DEFAULT_LIMITS = {
       "max_memory_mb" => 4096,
@@ -50,12 +51,13 @@ module Worker
       @token_file = token_file
       @limits = DEFAULT_LIMITS.merge(limits || {})
       @build = DEFAULT_BUILD.merge(build || {})
-      # docker の -v は相対パスを受け付けないので、ここで絶対パスにしておく
+      # docker -v will not take a relative path, so make it absolute here
       @runtime_dir = ::File.expand_path(runtime_dir || DEFAULT_RUNTIME_DIR)
     end
 
-    # systemd の LoadCredential= で渡された場合はそちらを優先する。
-    # 環境変数にトークンを置かないので、/proc/PID/environ にも systemctl show にも出ない。
+    # A credential handed over by systemd's LoadCredential= wins. The token never
+    # goes in the environment, so it shows up in neither /proc/PID/environ nor
+    # systemctl show.
     def token
       @token ||= ::File.read(token_path).strip
     end
@@ -77,9 +79,10 @@ module Worker
     def cache_ttl_days = build.fetch("cache_ttl_days")
     def max_images = build.fetch("max_images")
 
-    # VPS から来た要求値を上限として解釈し、自分の設定を超えていたら切り詰める。
-    # 切り詰めるのは上だけで、下は切り詰めずに拒否する。--pids-limit -1 は
-    # Docker が「無制限」と解釈するので、負数を黙って通すと制限が消える
+    # Read what the VPS asked for as a ceiling and trim anything above this
+    # worker's own. Only the top is trimmed; the bottom is refused instead.
+    # Docker reads --pids-limit -1 as "unlimited", so letting a negative through
+    # quietly would remove the limit rather than tighten it
     def clamp(requested)
       {
         memory_mb: clamp_integer(requested[:memory_mb], "max_memory_mb"),
@@ -90,8 +93,9 @@ module Worker
       }
     end
 
-    # 切り詰められない検証。ここに引っかかったら policy_rejected で返す。
-    # 展開する側ではなく、書き出す側で弾く。
+    # The validation that cannot be trimmed into shape. Anything caught here comes
+    # back as policy_rejected. It is refused where the files get written, not where
+    # they get unpacked.
     def validate_context!(dockerfile, files)
       total = dockerfile.to_s.bytesize
       files.each do |file|
@@ -123,7 +127,7 @@ module Worker
 
     private
 
-    # docker に整数で渡すもの。1 未満は拒否する
+    # Handed to docker as an integer. Anything below 1 is refused
     def clamp_integer(requested, key)
       max = limits.fetch(key)
       return max if requested.nil?
@@ -134,7 +138,8 @@ module Worker
       [ value, max ].min
     end
 
-    # cpus は小数を許す。プロファイルは整数だが、入力の形を狭めすぎない
+    # cpus may be fractional. The profiles are whole numbers, but there is no
+    # reason to narrow what the input is allowed to look like
     def clamp_number(requested, key)
       max = limits.fetch(key)
       return max if requested.nil?

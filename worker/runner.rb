@@ -13,9 +13,10 @@ require "worker/errors"
 require "worker/supervisor"
 
 module Worker
-  # ジョブ 1 件を最後まで面倒を見る。build → run → 統計の採取 → 片付け。
+  # Sees one job all the way through: build, run, collect statistics, clean up.
   #
-  # 実行コンテナは常に --network none。ネットワークが要るのは build フェーズだけ。
+  # A job container always runs with --network none. The build phase is the only
+  # part that needs the network at all.
   class Runner
     TRUNCATION_MARKER = "\n...[truncated]...\n"
 
@@ -46,8 +47,9 @@ module Worker
     rescue Error, SystemCallError, JSON::ParserError => e
       failure("worker_error", e, applied, started)
     rescue StandardError => e
-      # ここが最後の砦。ワーカーのバグで例外が漏れると、結果が返らずジョブが
-      # 宙吊りになり、リースが失効するまで誰も気づけない
+      # The last line of defense. If a bug in the worker lets an exception out,
+      # no result is ever sent, the job hangs, and nobody notices until the lease
+      # expires
       failure("worker_error", e, applied, started)
     end
 
@@ -85,8 +87,9 @@ module Worker
 
     public
 
-    # --rm は付けない。終了と同時にコンテナが消えると State.OOMKilled を読めない。
-    # 引数列そのものが検証の対象になるので public にしている。
+    # No --rm. A container that disappears the moment it exits takes
+    # State.OOMKilled with it. Public because the argument list itself is what
+    # the tests check.
     def run_args(payload, applied:, tag:, workdir:, container:)
       memory = "#{applied.fetch(:memory_mb)}m"
       args = [
@@ -94,8 +97,9 @@ module Worker
         "--name", container,
         "--label", "#{Protocol::Constants::CONTAINER_LABEL}=#{payload.job_id}",
         "--network", "none",
-        # 承認済み Blueprint 上の script はレビューされない。出力し続けるだけで
-        # ホストのディスクを埋められるので、docker 側でも上限を持つ
+        # A script running on an approved Blueprint is not itself reviewed. Left
+        # printing, it can fill the host's disk on its own, so docker holds a
+        # ceiling of its own too
         "--log-driver", "json-file",
         "--log-opt", "max-size=#{log_max_size}",
         "--log-opt", "max-file=2",
@@ -108,12 +112,13 @@ module Worker
         "--cap-drop", "ALL",
         "--security-opt", "no-new-privileges",
         "--ulimit", "core=0",
-        # ローカルに無いタグは失敗させる。Hub から同名のイメージを引かない
+        # Fail on a tag that is not already local, rather than pulling something
+        # from the Hub that happens to share the name
         "--pull", "never",
         "--volume", "#{workdir}:/work:ro"
       ]
 
-      # bench は cpuset でピン留めして他のジョブと排他にする
+      # bench gets pinned to a cpuset, which is how it stays exclusive of other jobs
       if Protocol::ResourceProfile.exist?(payload.profile) && Protocol::ResourceProfile.exclusive?(payload.profile)
         args += [ "--cpuset-cpus", "0-#{applied.fetch(:cpus) - 1}" ]
       end
@@ -123,7 +128,7 @@ module Worker
 
     private
 
-    # docker の max-size は k / m / g の接尾辞しか受け付けない
+    # docker's max-size only takes a k / m / g suffix
     def log_max_size
       kilobytes = (@policy.max_output_bytes / 1024.0).ceil
       "#{[ kilobytes, 1 ].max}k"
@@ -136,8 +141,9 @@ module Worker
       workdir
     end
 
-    # VPS から来た識別子をそのままパスとコンテナ名に使うので、形を確かめてから使う。
-    # ワーカーは VPS を全面的には信用しない。
+    # Identifiers from the VPS go straight into a path and a container name, so
+    # check their shape before using them. The worker does not extend the VPS full
+    # trust.
     def validate_identifiers!(payload)
       [ payload.job_id, payload.lease_id ].each do |id|
         raise PolicyRejected, "invalid identifier: #{id.inspect}" unless id.to_s.match?(/\A[0-9]+\z/)
@@ -148,8 +154,9 @@ module Worker
       end
     end
 
-    # digest は承認の単位そのものなので、受け取った中身から計算し直して一致を見る。
-    # 一致しなければ、承認済みの別イメージのタグを名乗られている
+    # The digest is the unit approval is granted in, so recompute it from the
+    # content that arrived and compare. A mismatch means something is claiming the
+    # tag of a different, approved image
     def validate_digest!(payload)
       recomputed = Protocol::BlueprintDigest.compute(
         dockerfile: payload.blueprint.dockerfile,
@@ -162,7 +169,8 @@ module Worker
       raise PolicyRejected, "digest does not match the context: #{payload.blueprint.digest} != #{recomputed}"
     end
 
-    # lease ごとに分ける。再 lease したときに前の試行のマウントと衝突しない
+    # One directory per lease, so a re-lease does not collide with the mount left
+    # by the previous attempt
     def job_dir(payload)
       File.join(@policy.runtime_dir, "#{payload.job_id}-#{payload.lease_id}")
     end
@@ -182,8 +190,8 @@ module Worker
       Docker.inspect_json(container)&.fetch("State", nil)
     end
 
-    # docker のバージョンによって sha256: が付いたり付かなかったりする。
-    # DB に入る形を揃えたいので、ここで正規化しておく。
+    # Depending on the docker version, the sha256: prefix is there or it is not.
+    # Normalize here so one shape reaches the database.
     def image_digest(tag)
       result = Docker.run("image", "inspect", "--format", "{{.Id}}", tag)
       return nil unless result.success?
@@ -208,7 +216,8 @@ module Worker
       [ stdout, stderr, stdout_truncated || stderr_truncated ]
     end
 
-    # 先頭と末尾の両方を残す。エラーは末尾に出るが、原因は先頭に出ることが多い。
+    # Keep both ends. The error shows up at the tail, but what caused it is
+    # usually near the head.
     def truncate(text)
       text = text.to_s
       limit = @policy.max_output_bytes

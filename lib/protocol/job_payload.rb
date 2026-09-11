@@ -4,8 +4,8 @@ require "time"
 require "protocol/constants"
 
 module Protocol
-  # /lease が返すジョブ 1 件。ワーカーはこれを受け取って実行する。
-  # files は常にインラインで届く（別 URL からの取得は用意しない）。
+  # One job as returned by /lease, and what the worker runs from.
+  # files always arrive inline; there is no fetch-from-a-URL path.
   class JobPayload
     Invalid = Class.new(StandardError)
 
@@ -28,7 +28,7 @@ module Protocol
         limits: symbolize(fetch!(hash, "limits"))
       )
     rescue ArgumentError => e
-      # Time.iso8601 の失敗。呼び出し側では他の壊れ方と区別する必要がない
+      # Time.iso8601 gave up. Callers have no reason to tell this apart from the other ways it can be malformed
       raise Invalid, "invalid lease payload: #{e.message}"
     end
 

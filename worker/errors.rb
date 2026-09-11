@@ -3,12 +3,12 @@
 module Worker
   Error = Class.new(StandardError)
 
-  # 切り詰められない検証に弾かれた。termination_reason: policy_rejected
+  # Refused by the validation that cannot be trimmed into shape. termination_reason: policy_rejected
   PolicyRejected = Class.new(Error)
 
-  # docker build の失敗。termination_reason: image_build_failed
+  # docker build failed. termination_reason: image_build_failed
   BuildFailed = Class.new(Error)
 
-  # docker 自体の失敗やワーカーのバグ。termination_reason: worker_error
+  # docker itself failed, or the worker has a bug. termination_reason: worker_error
   DockerError = Class.new(Error)
 end
