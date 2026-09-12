@@ -18,6 +18,20 @@ module McpTools
       def review_url(path)
         URI.join(Rails.configuration.x.mcp_coderunner_app.base_url, path).to_s
       end
+
+      # What happened the last time anything ran on an environment. Approving a
+      # Blueprint queues a job that builds it, so this is usually that job, and
+      # image_build_failed here means the environment itself is broken -- not the
+      # script that is about to be submitted.
+      def last_result_for(result)
+        return nil unless result
+
+        {
+          termination_reason: result.termination_reason,
+          exit_code: result.exit_code,
+          at: result.created_at.utc.iso8601
+        }
+      end
     end
   end
 end

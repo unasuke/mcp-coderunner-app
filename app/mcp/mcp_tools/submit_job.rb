@@ -5,6 +5,10 @@ module McpTools
       承認済みの Blueprint 上でスクリプトを実行する。すぐには返らず、job_id を返す。
       結果は get_job で取りに行く。
 
+      blueprint_last_result は、その実行環境で最後に走ったジョブの結果。
+      image_build_failed が返っているなら、このジョブも同じ理由で失敗する見込みが高い。
+      実行環境の側を直すこと。
+
       コンテナは隔離されている。ネットワークには出られない（DNS も引けない）。
       ファイルシステムは読み取り専用で、**書き込めるのは /tmp だけ**（tmpfs）。
       カレントディレクトリ（/work）に書き出す処理は EROFS で失敗するので、
@@ -42,7 +46,8 @@ module McpTools
           job_id: job.id,
           state: job.state,
           blueprint_digest: job.blueprint.digest,
-          profile: job.profile
+          profile: job.profile,
+          blueprint_last_result: last_result_for(job.blueprint.last_job_result)
         }
         payload[:review_url] = review_url("/admin/jobs/#{job.id}") if job.pending_review?
 

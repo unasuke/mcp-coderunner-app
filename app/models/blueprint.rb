@@ -74,6 +74,27 @@ class Blueprint < ApplicationRecord
     update!(state: :revoked, reviewed_by: by, reviewed_at: Time.current, review_note: note)
   end
 
+  # What happened the last time anything ran on this environment. The MCP tools
+  # hand it back so a client can tell "my script was wrong" from "this environment
+  # cannot be built", which otherwise look the same from the outside.
+  def last_job_result
+    self.class.last_job_results_for([ self ])[id]
+  end
+
+  # Same thing for a list, in one query rather than one per row. Both tables carry a
+  # created_at, so the order has to say which one it means. Ordered oldest first,
+  # index_by keeps the last write per blueprint -- the newest result.
+  def self.last_job_results_for(blueprints)
+    ids = Array(blueprints).map(&:id)
+    return {} if ids.empty?
+
+    JobResult.joins(:job)
+      .where(jobs: { blueprint_id: ids })
+      .order("job_results.created_at ASC")
+      .select("job_results.*", "jobs.blueprint_id AS blueprint_id")
+      .index_by(&:blueprint_id)
+  end
+
   def context_bytes
     dockerfile.bytesize + blueprint_files.sum { |file| file.content.bytesize }
   end

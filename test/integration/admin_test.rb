@@ -83,6 +83,34 @@ class AdminTest < ActionDispatch::IntegrationTest
     assert_equal "unasuke", @blueprint.reviewed_by.login
   end
 
+  # A Dockerfile that cannot be built used to be found out by submitting a job and
+  # waiting for image_build_failed. Approving queues that job itself, which also
+  # leaves the image warm for the first real one
+  test "approving a blueprint queues a job that builds it" do
+    sign_in
+
+    assert_difference -> { @blueprint.jobs.count }, 1 do
+      post approve_admin_blueprint_path(@blueprint)
+    end
+
+    job = @blueprint.jobs.last
+
+    assert_predicate job, :queued?
+    assert_equal "default", job.profile
+    assert_equal "unasuke", job.requested_by.login
+    assert_equal Blueprints::Approve::VERIFICATION_SCRIPT, job.script
+  end
+
+  # Approval is a judgement about content and stands on its own. Rejecting one does
+  # not queue anything
+  test "rejecting a blueprint queues nothing" do
+    sign_in
+
+    assert_no_difference -> { Job.count } do
+      post reject_admin_blueprint_path(@blueprint)
+    end
+  end
+
   test "an admin rejects a blueprint with a note" do
     sign_in
 

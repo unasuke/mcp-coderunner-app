@@ -93,6 +93,42 @@ class McpTest < ActionDispatch::IntegrationTest
     assert_equal [ approved.digest ], payload["blueprints"].map { |b| b["digest"] }
   end
 
+  # The build check queued at approval time is what usually fills this in. Without
+  # it a client cannot tell a broken script from an environment that will not build
+  test "list_blueprints reports what happened last on each environment" do
+    blueprint = Blueprint.create!(name: "ready", summary: "y", dockerfile: "FROM b\n",
+      digest: Blueprint.digest_for(dockerfile: "FROM b\n", files: []), state: :approved)
+    job = Job.create!(blueprint:, script: "puts 1", profile: "default", state: :finished)
+    job.create_job_result!(termination_reason: "image_build_failed", applied_limits: {})
+
+    payload, = tool("list_blueprints")
+
+    assert_equal "image_build_failed", payload["blueprints"].first.dig("last_result", "termination_reason")
+  end
+
+  test "list_blueprints leaves last_result null before anything has run" do
+    Blueprint.create!(name: "ready", summary: "y", dockerfile: "FROM b\n",
+      digest: Blueprint.digest_for(dockerfile: "FROM b\n", files: []), state: :approved)
+
+    payload, = tool("list_blueprints")
+
+    assert_nil payload["blueprints"].first["last_result"]
+  end
+
+  # Told at submission time, a client can stop rewriting a script that was never
+  # the problem
+  test "submit_job carries the environment's last result" do
+    blueprint = Blueprint.create!(name: "ready", summary: "y", dockerfile: "FROM b\n",
+      digest: Blueprint.digest_for(dockerfile: "FROM b\n", files: []), state: :approved)
+    failed = Job.create!(blueprint:, script: "puts 1", profile: "default", state: :finished)
+    failed.create_job_result!(termination_reason: "image_build_failed", applied_limits: {})
+
+    payload, error = tool("submit_job", { blueprint: blueprint.digest, script: "puts 2" })
+
+    refute error
+    assert_equal "image_build_failed", payload.dig("blueprint_last_result", "termination_reason")
+  end
+
   test "submit_job queues on an approved blueprint" do
     blueprint = Blueprint.create!(name: "ready", summary: "y", dockerfile: "FROM b\n",
       digest: Blueprint.digest_for(dockerfile: "FROM b\n", files: []), state: :approved)

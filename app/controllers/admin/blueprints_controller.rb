@@ -10,11 +10,14 @@ module Admin
       @parent = @blueprint.parent
     end
 
+    # Approving also queues a job that builds the image, so a Dockerfile that cannot
+    # be built says so here rather than inside the first real job
     def approve
       return redirect_to(admin_blueprint_path(@blueprint), alert: refusal) unless @blueprint.reviewable?
 
-      @blueprint.approve!(by: current_user)
-      redirect_to admin_blueprint_path(@blueprint), notice: "承認しました"
+      job = Blueprints::Approve.call(blueprint: @blueprint, by: current_user)
+      redirect_to admin_blueprint_path(@blueprint),
+        notice: "承認しました。ビルドの確認にジョブ ##{job.id} を投入しました"
     end
 
     def reject
