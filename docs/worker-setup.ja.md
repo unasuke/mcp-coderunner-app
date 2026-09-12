@@ -253,7 +253,10 @@ ruby -Ilib -I. -e 'require "worker/runner"'
 sudo /opt/mcp-coderunner-app/deploy/update-worker.sh
 ```
 
-`origin/main` に合わせて、`REVISION` を書き直し、unit を再起動する。
+`origin/main` に合わせ、`REVISION` を書き直し、**checkout の unit を入れ直して** `daemon-reload` し、
+ワーカーを再起動する。unit を毎回入れ直すのは、コードと同じ頻度で変わるから。pull するだけの VM は、
+最初に置いた unit のまま「最新のつもり」で動き続けることになる。`/etc/systemd/system/<unit>.d/` の
+drop-in には触らない。
 `git pull` ではなく `git reset --hard` なので、手元に差分が残っていても結果が一意になる。
 `bundle install` は要らない（ワーカーは stdlib だけで書かれている）。
 

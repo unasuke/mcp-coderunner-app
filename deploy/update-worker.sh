@@ -3,28 +3,24 @@
 #
 #   sudo /opt/mcp-coderunner-app/deploy/update-worker.sh
 #
-# No bundle install. The worker is written against stdlib alone, so replacing the
-# files and restarting is all of it.
+# No bundle install. The worker is written against stdlib alone, so the files, the
+# units and a restart are all of it.
 #
-# A restart interrupts whatever was running, but the shutdown path calls
-# /deregister, so those jobs return to the queue without consuming an attempt.
-# The worker that comes up next picks them back up.
+# The units are reinstalled from the checkout every time. They change as often as
+# the code does -- rootless brought an EnvironmentFile, DOCKER_CONFIG and
+# ProtectHome=no -- and a VM that only ever pulls would keep running the unit it
+# was first given while believing it was up to date. Drop-ins under
+# /etc/systemd/system/<unit>.d/ are left alone.
+#
+# A restart interrupts whatever was running. The worker holds its lease, calls
+# /deregister on the way out, and the job returns to the queue without consuming
+# an attempt; the worker that comes up next picks it back up.
 set -eu
 
 CHECKOUT="${CHECKOUT:-/opt/mcp-coderunner-app}"
 BRANCH="${BRANCH:-main}"
 UNIT="${UNIT:-mcp-coderunner-app-worker}"
-WORKER_USER="${WORKER_USER:-mcp-coderunner-app}"
-WORKER_ENV="${WORKER_ENV:-/etc/mcp-coderunner-app/worker.env}"
-
-# The daemon is rootless and belongs to the worker's account, so root's docker
-# reaches nothing. Ask as that user, with the socket the units are given.
-running_jobs() {
-  [ -r "$WORKER_ENV" ] || return 0
-
-  sudo -u "$WORKER_USER" env "$(grep -s ^DOCKER_HOST= "$WORKER_ENV")" \
-    docker ps -q --filter label=mcp-coderunner-app.job 2>/dev/null | wc -l
-}
+UNIT_DIR="${UNIT_DIR:-/etc/systemd/system}"
 
 cd "$CHECKOUT"
 
@@ -37,16 +33,18 @@ git reset --hard "origin/${BRANCH}"
 after="$(git rev-parse --short HEAD)"
 
 if [ "$before" = "$after" ]; then
-  echo "already at ${after}; restarting only"
+  echo "already at ${after}; reinstalling units and restarting"
 fi
 
 # Forget this and the drift warning at /admin/workers starts lying
 git rev-parse HEAD > REVISION
 
-running="$(running_jobs)"
-if [ "${running:-0}" -gt 0 ]; then
-  echo "interrupting ${running} running job(s); they return to the queue"
-fi
+for unit in mcp-coderunner-app-worker.service \
+            mcp-coderunner-app-prune.service \
+            mcp-coderunner-app-prune.timer; do
+  install -m 0644 "deploy/${unit}" "${UNIT_DIR}/${unit}"
+done
+systemctl daemon-reload
 
 systemctl restart "$UNIT"
 

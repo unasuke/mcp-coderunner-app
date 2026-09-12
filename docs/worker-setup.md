@@ -270,8 +270,11 @@ anyway, by way of Rails, which is why human review does not catch it.
 sudo /opt/mcp-coderunner-app/deploy/update-worker.sh
 ```
 
-It brings the checkout in line with `origin/main`, rewrites `REVISION`, and restarts the
-unit. It uses `git reset --hard` rather than `git pull`, so the result is the same
+It brings the checkout in line with `origin/main`, rewrites `REVISION`, reinstalls the
+units from the checkout, reloads systemd, and restarts the worker. The units are
+reinstalled every time because they change as often as the code does -- a VM that only
+pulled would keep the unit it was first given while believing it was current.
+Drop-ins under `/etc/systemd/system/<unit>.d/` are left alone. It uses `git reset --hard` rather than `git pull`, so the result is the same
 whether or not the checkout was dirty. No `bundle install` (the worker is written
 against stdlib alone).
 
