@@ -19,22 +19,30 @@ module Admin
       redirect_to admin_blueprint_path(@blueprint), notice: approval_notice(result)
     end
 
+    # Jobs waiting on this environment go with it: none of them can ever be approved
     def reject
       return redirect_to(admin_blueprint_path(@blueprint), alert: refusal) unless @blueprint.reviewable?
 
-      @blueprint.reject!(by: current_user, note: params[:review_note])
-      redirect_to admin_blueprint_path(@blueprint), notice: "却下しました"
+      rejected = Blueprints::Withdraw.reject(blueprint: @blueprint, by: current_user, note: params[:review_note])
+      redirect_to admin_blueprint_path(@blueprint), notice: "却下しました#{waiting_jobs_notice(rejected)}"
     end
 
     # Revoking stops new submissions only. A job already queued still runs
     def revoke
       return redirect_to(admin_blueprint_path(@blueprint), alert: refusal) unless @blueprint.revocable?
 
-      @blueprint.revoke!(by: current_user, note: params[:review_note])
-      redirect_to admin_blueprint_path(@blueprint), notice: "失効させました（キューに残っているジョブは実行されます）"
+      rejected = Blueprints::Withdraw.revoke(blueprint: @blueprint, by: current_user, note: params[:review_note])
+      redirect_to admin_blueprint_path(@blueprint),
+        notice: "失効させました（キューに残っているジョブは実行されます）#{waiting_jobs_notice(rejected)}"
     end
 
     private
+
+    def waiting_jobs_notice(rejected)
+      return "" if rejected.empty?
+
+      "。レビュー待ちだったジョブ #{rejected.size} 件も却下しました"
+    end
 
     def approval_notice(result)
       notice = "承認しました。ビルドの確認にジョブ ##{result.verification_job.id} を投入しました"

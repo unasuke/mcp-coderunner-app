@@ -143,6 +143,32 @@ class AdminTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # A job is only approvable while its Blueprint is approved, so one left waiting
+  # here is waiting for an answer nobody can give
+  test "rejecting a blueprint rejects the jobs waiting on it" do
+    waiting = Job.create!(blueprint: @blueprint, script: "puts 1", profile: "default")
+    sign_in
+
+    post reject_admin_blueprint_path(@blueprint)
+
+    assert_predicate waiting.reload, :rejected?
+    assert_match(/ジョブ 1 件/, flash[:notice])
+  end
+
+  # Revoking stops new submissions and lets the queue drain, which is unchanged.
+  # What it cannot do is leave a job in a review that can no longer be answered
+  test "revoking a blueprint rejects what is still in review and spares the queue" do
+    @blueprint.update!(state: :approved)
+    waiting = Job.create!(blueprint: @blueprint, script: "puts 1", profile: "bench")
+    queued = Job.create!(blueprint: @blueprint, script: "puts 1", profile: "default", state: :queued)
+    sign_in
+
+    post revoke_admin_blueprint_path(@blueprint)
+
+    assert_predicate waiting.reload, :rejected?
+    assert_predicate queued.reload, :queued?
+  end
+
   test "an admin rejects a blueprint with a note" do
     sign_in
 
