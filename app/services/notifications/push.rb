@@ -14,6 +14,13 @@ module Notifications
       Rails.configuration.x.mcp_coderunner_app
     end
 
+    # The contact a push service would use if something here were wrong. This site
+    # answers that as well as an address does, and keeps a personal one out of a
+    # JWT sent to Apple, Google and Mozilla
+    def self.subject
+      config.vapid_subject.presence || config.base_url
+    end
+
     def self.to_admins(title:, body:, path:)
       return unless configured?
 
@@ -25,7 +32,7 @@ module Notifications
     def self.deliver(subscription, title:, body:, path:)
       WebPush.payload_send(
         message: JSON.generate(title:, options: { body:, data: { path: } }),
-        vapid: { subject: config.vapid_subject, public_key: config.vapid_public_key,
+        vapid: { subject:, public_key: config.vapid_public_key,
                  private_key: config.vapid_private_key },
         urgency: "normal",
         **subscription.to_web_push

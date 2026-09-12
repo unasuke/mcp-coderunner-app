@@ -44,6 +44,18 @@ class Notifications::PushTest < ActiveSupport::TestCase
     assert_empty PushSubscription.where(id: @subscription.id)
   end
 
+  # RFC 8292 wants a contact URI. Unset, this site answers for itself -- better
+  # than a placeholder on a reserved domain, which Apple would reject
+  test "the subject falls back to this site" do
+    assert_equal Rails.configuration.x.mcp_coderunner_app.base_url, Notifications::Push.subject
+
+    Rails.configuration.x.mcp_coderunner_app.vapid_subject = "mailto:someone@example.com"
+
+    assert_equal "mailto:someone@example.com", Notifications::Push.subject
+  ensure
+    Rails.configuration.x.mcp_coderunner_app.vapid_subject = nil
+  end
+
   # A push service being slow or broken is not the review's problem
   test "any other failure leaves the subscription alone" do
     with_web_push ->(**) { raise WebPush::PushServiceError.new(gone_response, "push.example.invalid") } do

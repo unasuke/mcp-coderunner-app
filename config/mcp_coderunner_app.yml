@@ -42,9 +42,11 @@ shared:
   vapid_public_key: <%= ENV["VAPID_PUBLIC_KEY"] %>
   vapid_private_key: <%= ENV["VAPID_PRIVATE_KEY"] %>
   # Where a push service reaches the sender if something is wrong. mailto: or https:
-  # presence, not fetch: the deploy passes this through as an empty string when it
-  # is not configured, and fetch would hand that straight to the push service
-  vapid_subject: <%= ENV["VAPID_SUBJECT"].presence || "mailto:noreply@example.com" %>
+  # Where a push service reaches the sender if something is wrong (RFC 8292 wants a
+  # mailto: or an https: URI). Left unset it falls back to base_url, which is true
+  # and valid; a placeholder address on a reserved domain would be neither, and
+  # Apple rejects a JWT whose subject it cannot make sense of.
+  vapid_subject: <%= ENV["VAPID_SUBJECT"] %>
 
   # The development door that signs in without going through GitHub.
   # It bypasses the center of the authorization model -- that an authorization code

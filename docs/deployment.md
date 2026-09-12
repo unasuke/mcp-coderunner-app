@@ -20,7 +20,7 @@ reads them from the environment: from your shell by hand, from secrets in CI.
 | `BOOTSTRAP_ADMIN_GITHUB_LOGIN` | The login name that becomes admin on its first sign-in |
 | `KAMAL_VERSION` | The deployed revision. Used to spot drift against the worker |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | Web Push. Without them the feature is absent: no button, no delivery |
-| `VAPID_SUBJECT` | Where a push service reaches you. `mailto:` or `https:` |
+| `VAPID_SUBJECT` | Where a push service reaches you: a `mailto:` or `https:` URI (RFC 8292). Unset, the public URL is used, which keeps a personal address out of a JWT bound for Apple and Google. Changing it does not invalidate subscriptions |
 
 `allow_developer_login` belongs to the same list by implication: in development it is
 true, and `/login` then offers a door that skips GitHub. **It must never be true in
