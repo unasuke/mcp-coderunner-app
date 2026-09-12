@@ -15,6 +15,11 @@
 # being caught by the same rule costs nothing.
 #
 # Loopback is deliberately not dropped: rootlesskit and the local sockets live there.
+#
+# Both rules count what they drop, so the block can be seen rather than inferred
+# from a connection that failed:
+#
+#   sudo nft list table inet mcp-coderunner-app
 
 table inet mcp-coderunner-app
 delete table inet mcp-coderunner-app
@@ -25,7 +30,7 @@ table inet mcp-coderunner-app {
 
     # 169.254.0.0/16 is link-local, which is also where a cloud image's metadata
     # service answers
-    meta skuid @UID@ ip daddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16 } drop
-    meta skuid @UID@ ip6 daddr { fc00::/7, fe80::/10 } drop
+    meta skuid @UID@ ip daddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16 } counter drop
+    meta skuid @UID@ ip6 daddr { fc00::/7, fe80::/10 } counter drop
   }
 }

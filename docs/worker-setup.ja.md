@@ -228,6 +228,13 @@ sudo -u mcp-coderunner-app env DOCKER_HOST=unix:///run/user/$uid/docker.sock \
 # exit=0 にならないこと
 ```
 
+`nc` の失敗は「遮断された」とも「元からそのポートが開いていない」とも読めるので、
+終了ステータスではなくカウンタを見る。
+
+```sh
+sudo nft list table inet mcp-coderunner-app   # drop 側のカウンタが増えていること
+```
+
 実行コンテナは `--network none` で走るのでそもそも外に出られない。ここで守っているのは
 **build フェーズ**で、Blueprint のレビューと合わせて 2 段で効かせる。
 

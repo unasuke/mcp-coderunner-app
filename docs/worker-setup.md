@@ -243,6 +243,13 @@ sudo -u mcp-coderunner-app env DOCKER_HOST=unix:///run/user/$uid/docker.sock \
 # must not be exit=0
 ```
 
+A refused connection and a port nobody was listening on look the same from here, so
+read the counter rather than trusting the exit status:
+
+```sh
+sudo nft list table inet mcp-coderunner-app   # the drop rule's counter should have moved
+```
+
 Job containers run with `--network none`, so they cannot reach anything to begin with.
 What this protects is the **build phase**, and together with Blueprint review it makes
 two layers.
