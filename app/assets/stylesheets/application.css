@@ -88,12 +88,24 @@ a:hover { text-decoration-thickness: 2px; }
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.14em;
+  text-decoration: none;
   color: var(--ink-soft);
   margin-right: var(--step);
 }
 
-/* Emoji sit large on the line, so pull it in slightly to match the text beside it */
-.bar-glyph { font-size: 15px; letter-spacing: 0; }
+/* The glyph is the whole link now: it carries the click target, and with no text
+   beside it the only thing saying it can be clicked is that it answers to a hover */
+.bar-glyph {
+  font-size: 17px;
+  letter-spacing: 0;
+  line-height: 1;
+  transition: transform 80ms ease-out;
+}
+.bar-mark:hover .bar-glyph { transform: scale(1.08); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bar-glyph { transition: none; }
+}
 .gate-glyph { font-size: 1.1em; }
 
 .bar nav { display: flex; flex-wrap: wrap; gap: calc(var(--step) * 2); flex: 1; }

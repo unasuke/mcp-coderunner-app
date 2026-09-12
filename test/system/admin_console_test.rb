@@ -88,6 +88,11 @@ class AdminConsoleTest < ApplicationSystemTestCase
 
     assert_text "起動コマンド"
     assert_no_horizontal_overflow
+
+    # The mark is the only way back to the top once the name is gone from the bar
+    click_link "mcp-coderunner-app"
+
+    assert_current_path root_path
   end
 
   private

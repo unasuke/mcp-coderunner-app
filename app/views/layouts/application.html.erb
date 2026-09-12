@@ -26,7 +26,12 @@
   <body>
     <% if Current.user %>
       <header class="bar">
-        <span class="bar-mark"><span class="bar-glyph" aria-hidden="true">📋</span>mcp-coderunner-app</span>
+        <%# Just the glyph: the name is in the title bar, and the row is narrow enough
+            on a phone as it is. aria-label because an emoji is not a name %>
+        <%= link_to root_path, class: "bar-mark", title: "mcp-coderunner-app",
+              "aria-label": "mcp-coderunner-app" do %>
+          <span class="bar-glyph" aria-hidden="true">📋</span>
+        <% end %>
 
         <nav>
           <%= link_to "ジョブ", admin_jobs_path, "aria-current": ("page" if controller_path == "admin/jobs") %>
