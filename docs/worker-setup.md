@@ -154,6 +154,10 @@ unit under whatever `HOME` you hand it, and a mismatch ends in
 sudo usermod --home /var/lib/mcp-coderunner-app mcp-coderunner-app   # no -m: the tool already wrote there
 sudo gpasswd -d mcp-coderunner-app docker                            # the unit no longer asks for it
 sudo systemctl restart user@$(id -u mcp-coderunner-app).service      # so it rereads passwd
+
+# The job working directory cannot stay under /run: the rootless daemon has its own
+sudo sed -i 's,^runtime_dir:.*,runtime_dir: /var/lib/mcp-coderunner-app/work,' \
+  /etc/mcp-coderunner-app/config.yml
 ```
 
 Images built by the rootful daemon stay with it and are invisible to the rootless
@@ -288,6 +292,7 @@ expire.
 |---|---|
 | a job sits in `queued` | Is the instance listed at `/admin/workers`? Is `drain` set (a protocol_version mismatch)? |
 | `policy_rejected` comes back | The limits in `/etc/mcp-coderunner-app/config.yml`, and the paths in the Blueprint's context |
+| `ruby: No such file or directory -- /work/script.rb` | The job's working directory is under /run. The rootless daemon has a /run of its own (rootlesskit `--copy-up=/run`), so it cannot see the one the worker wrote to, and docker mounts an empty directory in its place. Set `runtime_dir` to a path under `/var/lib/mcp-coderunner-app` |
 | a build hangs, then fails on `apt-get update` | DNS. The container cannot reach the host's `127.0.0.53`; see "DNS for the build phase" |
 | `image_build_failed` | The build log is at the tail of `job_results.stderr` |
 | repeated 401s | Has the token been revoked (`/admin/workers`)? Did a newline get into `/etc/mcp-coderunner-app/token`? |

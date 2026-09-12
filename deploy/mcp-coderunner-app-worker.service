@@ -37,6 +37,9 @@ TimeoutStopSec=90
 Restart=always
 RestartSec=5
 
+# RuntimeDirectory is for DOCKER_CONFIG above and nothing else -- it is not where
+# jobs get their working directory. That lives under StateDirectory, because the
+# rootless daemon has a /run of its own and cannot see into this one
 RuntimeDirectory=mcp-coderunner-app
 StateDirectory=mcp-coderunner-app
 

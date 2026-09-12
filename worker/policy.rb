@@ -25,7 +25,16 @@ module Worker
       "max_images" => 40
     }.freeze
 
-    DEFAULT_RUNTIME_DIR = "/run/mcp-coderunner-app"
+    # Not under /run. The rootless daemon runs inside rootlesskit, which is started
+    # with --copy-up=/run: its /run is a tmpfs of its own, filled in when it started.
+    # A directory the worker creates under the host's /run afterwards does not exist
+    # over there, and docker answers a bind of a missing path by making an empty
+    # directory -- so the container gets an empty /work and the script it was asked
+    # to run is simply not there.
+    #
+    # /var/lib is shared, and this sits under the unit's StateDirectory, which is
+    # writable even with ProtectSystem=strict.
+    DEFAULT_RUNTIME_DIR = "/var/lib/mcp-coderunner-app/work"
 
     MAX_PATH_LENGTH = 255
 

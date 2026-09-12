@@ -144,6 +144,10 @@ rootful のワーカーを動かしていた VM では**アカウントが既に
 sudo usermod --home /var/lib/mcp-coderunner-app mcp-coderunner-app   # -m は付けない。ツールが既にそこへ書いている
 sudo gpasswd -d mcp-coderunner-app docker                            # unit はもう要求しない
 sudo systemctl restart user@$(id -u mcp-coderunner-app).service      # passwd を読み直させる
+
+# ジョブの作業ディレクトリは /run の下に置けない。rootless の daemon は自分の /run を持つ
+sudo sed -i 's,^runtime_dir:.*,runtime_dir: /var/lib/mcp-coderunner-app/work,' \
+  /etc/mcp-coderunner-app/config.yml
 ```
 
 rootful の daemon が作ったイメージは rootless からは見えないので、最初のジョブは
@@ -269,6 +273,7 @@ sudo /opt/mcp-coderunner-app/deploy/update-worker.sh
 |---|---|
 | ジョブが `queued` のまま動かない | `/admin/workers` にインスタンスが出ているか。`drain` が立っていないか（protocol_version のずれ） |
 | `policy_rejected` が返る | `/etc/mcp-coderunner-app/config.yml` の上限と、Blueprint の context のパス |
+| `ruby: No such file or directory -- /work/script.rb` | ジョブの作業ディレクトリが `/run` の下にある。rootless の daemon は自分の `/run` を持つ（rootlesskit の `--copy-up=/run`）ので、ワーカーが書いた側は見えず、docker が空のディレクトリを代わりに mount する。`runtime_dir` を `/var/lib/mcp-coderunner-app` の下にする |
 | build が固まった末に `apt-get update` で失敗する | DNS。ホストの `127.0.0.53` にコンテナからは届かない。「build フェーズの DNS」を見る |
 | `image_build_failed` | `job_results.stderr` の末尾にビルドログが入っている |
 | 401 が続く | トークンが失効していないか（`/admin/workers`）。`/etc/mcp-coderunner-app/token` の中身に改行が混ざっていないか |

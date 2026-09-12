@@ -72,6 +72,16 @@ class PolicyTest < Minitest::Test
     assert_raises(Worker::PolicyRejected) { policy.validate_context!("FROM ruby", files) }
   end
 
+  # The job's working directory is bind-mounted into the container, and the rootless
+  # daemon has a /run of its own (rootlesskit --copy-up=/run). Put this back under
+  # /run and every container gets an empty /work instead of the script
+  def test_the_default_working_directory_is_somewhere_the_daemon_can_see
+    default = Worker::Policy.new(worker_id: "w", endpoint: "https://example.invalid").runtime_dir
+
+    refute_match %r{\A/run/}, default
+    assert_equal "/var/lib/mcp-coderunner-app/work", default
+  end
+
   def test_reads_the_token_from_a_systemd_credential
     Dir.mktmpdir do |dir|
       File.write(File.join(dir, "api_token"), "secret\n")

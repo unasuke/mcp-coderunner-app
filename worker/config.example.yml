@@ -3,8 +3,11 @@ worker_id: home-vm-01
 endpoint: https://mcp-coderunner-app.example.com
 token_file: /etc/mcp-coderunner-app/token
 
-# The per-job working directory. Keep it in step with systemd's RuntimeDirectory=
-runtime_dir: /run/mcp-coderunner-app
+# The per-job working directory. This is bind-mounted into the container, so it has
+# to be somewhere the daemon can see. Not /run: the rootless daemon has a /run of its
+# own (rootlesskit --copy-up=/run) and a directory created there afterwards is not in
+# it, which leaves the container with an empty /work.
+runtime_dir: /var/lib/mcp-coderunner-app/work
 
 # The worker's own source of truth. Anything from the VPS above these is trimmed, then run
 limits:

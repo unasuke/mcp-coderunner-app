@@ -14,7 +14,7 @@ class RunnerTest < Minitest::Test
   def args(payload: build_payload, applied: nil)
     applied ||= @policy.clamp(payload.limits)
     @runner.run_args(payload, applied:, tag: "mcp-coderunner-app/bp:#{payload.blueprint.digest}",
-      workdir: "/run/mcp-coderunner-app/1042/work", container: "mcp-coderunner-app-1042-88")
+      workdir: "/var/lib/mcp-coderunner-app/work/1042/work", container: "mcp-coderunner-app-1042-88")
   end
 
   def pair(list, flag)
@@ -63,7 +63,9 @@ class RunnerTest < Minitest::Test
   end
 
   def test_mounts_the_work_directory_read_only
-    assert_equal "/run/mcp-coderunner-app/1042/work:/work:ro", pair(args, "--volume")
+    # Whatever workdir it is handed is what gets mounted. The host path itself is the
+    # policy's business, not this one's
+    assert_equal "/var/lib/mcp-coderunner-app/work/1042/work:/work:ro", pair(args, "--volume")
   end
 
   def test_labels_the_container_for_orphan_cleanup
