@@ -1,6 +1,8 @@
 require "test_helper"
 
 class McpTest < ActionDispatch::IntegrationTest
+  include ActiveJob::TestHelper
+
   setup do
     @user = User.create!(github_uid: "1", login: "unasuke", role: :member)
     @application = Doorkeeper::Application.create!(
@@ -80,6 +82,24 @@ class McpTest < ActionDispatch::IntegrationTest
 
     assert second["created"]
     assert_equal first["blueprint_id"], Blueprint.find(second["blueprint_id"]).parent_id
+  end
+
+  # Nothing else tells a human that something is waiting for them
+  test "proposing a blueprint asks the admins to come and look" do
+    assert_enqueued_with(job: PushNotificationJob) do
+      tool("propose_blueprint", { name: "ruby", summary: "x", dockerfile: "FROM ruby:3.4-slim\n" })
+    end
+  end
+
+  # The same content proposed again returns the row that is already there. That is
+  # not news, and a notification for it would train its reader to ignore them
+  test "proposing the same content again notifies nobody" do
+    payload = { name: "ruby", summary: "x", dockerfile: "FROM ruby:3.4-slim\n" }
+    tool("propose_blueprint", payload)
+
+    assert_no_enqueued_jobs(only: PushNotificationJob) do
+      tool("propose_blueprint", payload.merge(name: "another-name"))
+    end
   end
 
   test "list_blueprints only returns approved ones" do

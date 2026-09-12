@@ -3,6 +3,18 @@
 <div class="sheet">
   <h1>実行環境 <span class="h1-sub"><%= @blueprints.size %> 件</span></h1>
 
+  <%# Subscribing belongs to the browser you are holding, so it lives on the page
+      where reviews happen rather than in a per-account setting %>
+  <% if Notifications::Push.configured? %>
+    <div class="actions" data-controller="push"
+         data-push-public-key-value="<%= Rails.configuration.x.mcp_coderunner_app.vapid_public_key %>">
+      <button type="button" data-push-target="button" data-action="push#toggle">
+        このブラウザで通知を受け取る
+      </button>
+      <span class="dim" data-push-target="state"></span>
+    </div>
+  <% end %>
+
   <% if @blueprints.empty? %>
     <div class="empty">
       <p>まだ実行環境がありません。</p>

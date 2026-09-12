@@ -331,6 +331,33 @@ class AdminTest < ActionDispatch::IntegrationTest
     assert_equal 0, other.sessions.count
   end
 
+  # The browser is the only thing that knows its own endpoint, so subscribing twice
+  # from one has to land on the same row rather than piling up
+  test "a browser subscribes and unsubscribes itself" do
+    sign_in
+    endpoint = "https://push.example.invalid/abc"
+
+    2.times do
+      post admin_push_subscription_path, params: { endpoint:, p256dh: "p", auth: "a" }
+    end
+
+    assert_response :created
+    assert_equal 1, PushSubscription.where(endpoint:).count
+    assert_equal "unasuke", PushSubscription.find_by(endpoint:).user.login
+
+    delete admin_push_subscription_path, params: { endpoint: }
+
+    assert_response :no_content
+    assert_empty PushSubscription.where(endpoint:)
+  end
+
+  test "subscribing needs an admin session" do
+    post admin_push_subscription_path, params: { endpoint: "https://push.example.invalid/x", p256dh: "p", auth: "a" }
+
+    assert_redirected_to login_path
+    assert_equal 0, PushSubscription.count
+  end
+
   # Demoting the only admin closes the door from the inside: approving users,
   # Blueprints and jobs all need one, and bootstrap_admin_login only applies to an
   # account's first sign-in. The way back would be a console on the server

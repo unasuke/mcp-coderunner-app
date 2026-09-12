@@ -6,6 +6,7 @@ class User < ApplicationRecord
   enum :role, { pending: "pending", member: "member", admin: "admin" }, default: "pending"
 
   has_many :sessions, dependent: :destroy
+  has_many :push_subscriptions, dependent: :destroy
   belongs_to :approved_by, class_name: "User", optional: true
 
   validates :github_uid, presence: true, uniqueness: true

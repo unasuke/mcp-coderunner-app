@@ -7,5 +7,8 @@ import { application } from "./application"
 import ClipboardController from "./clipboard_controller"
 application.register("clipboard", ClipboardController)
 
+import PushController from "./push_controller"
+application.register("push", PushController)
+
 import RefreshController from "./refresh_controller"
 application.register("refresh", RefreshController)

@@ -35,6 +35,15 @@ shared:
   github_client_id: <%= ENV["GITHUB_CLIENT_ID"] %>
   github_client_secret: <%= ENV["GITHUB_CLIENT_SECRET"] %>
 
+  # Web Push. With no keys the feature is simply absent, the same way GitHub
+  # sign-in is. Generate the pair once and keep it: replacing it invalidates every
+  # subscription that was made against the old one.
+  #   bin/rails runner 'k = WebPush.generate_key; puts k.public_key; puts k.private_key'
+  vapid_public_key: <%= ENV["VAPID_PUBLIC_KEY"] %>
+  vapid_private_key: <%= ENV["VAPID_PRIVATE_KEY"] %>
+  # Where a push service reaches the sender if something is wrong. mailto: or https:
+  vapid_subject: <%= ENV.fetch("VAPID_SUBJECT", "mailto:noreply@example.com") %>
+
   # The development door that signs in without going through GitHub.
   # It bypasses the center of the authorization model -- that an authorization code
   # is only issued to a session holding member or above. **Never true in production.**

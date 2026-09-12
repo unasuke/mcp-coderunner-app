@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_09_142850) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_12_060000) do
   create_table "blueprint_files", force: :cascade do |t|
     t.integer "blueprint_id", null: false
     t.text "content", null: false
@@ -140,6 +140,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_09_142850) do
     t.index ["uid"], name: "index_oauth_applications_on_uid", unique: true
   end
 
+  create_table "push_subscriptions", force: :cascade do |t|
+    t.string "auth_key", null: false
+    t.datetime "created_at", null: false
+    t.string "endpoint", null: false
+    t.string "p256dh_key", null: false
+    t.datetime "updated_at", null: false
+    t.string "user_agent"
+    t.integer "user_id", null: false
+    t.index ["endpoint"], name: "index_push_subscriptions_on_endpoint", unique: true
+    t.index ["user_id"], name: "index_push_subscriptions_on_user_id"
+  end
+
   create_table "sessions", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "ip_address"
@@ -209,6 +221,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_09_142850) do
   add_foreign_key "leases", "jobs"
   add_foreign_key "oauth_access_grants", "oauth_applications", column: "application_id"
   add_foreign_key "oauth_access_tokens", "oauth_applications", column: "application_id"
+  add_foreign_key "push_subscriptions", "users"
   add_foreign_key "sessions", "users"
   add_foreign_key "users", "users", column: "approved_by_id"
 end

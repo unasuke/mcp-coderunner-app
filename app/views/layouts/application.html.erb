@@ -19,6 +19,8 @@
     <link rel="icon" href="/icon.png" type="image/png" sizes="512x512">
     <link rel="icon" href="/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icon.png">
+    <%# Needed for the home screen, and on iOS that is the only way Web Push works %>
+    <link rel="manifest" href="<%= pwa_manifest_path %>">
     <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
     <%= javascript_include_tag "application", "data-turbo-track": "reload", type: "module" %>
   </head>

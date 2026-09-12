@@ -41,6 +41,9 @@ Rails.application.routes.draw do
 
     resources :users, only: [ :index, :update ]
 
+    # One browser's agreement to be notified, not a person's
+    resource :push_subscription, only: [ :create, :destroy ]
+
     resources :workers, only: [ :index, :create ] do
       member { post :revoke }
     end
@@ -69,9 +72,11 @@ Rails.application.routes.draw do
   # Can be used by load balancers and uptime monitors to verify that the app is live.
   get "up" => "rails/health#show", as: :rails_health_check
 
-  # Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.erb)
-  # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
-  # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
+  # The service worker is what receives a push while nothing is open, so it has to
+  # be served from the root to have the whole site in its scope. Both are public:
+  # the manifest names the app and the worker holds no secret
+  get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
+  get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
 
   root "admin/jobs#index"
 end

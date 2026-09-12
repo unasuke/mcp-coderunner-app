@@ -19,6 +19,8 @@ reads them from the environment: from your shell by hand, from secrets in CI.
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub sign-in |
 | `BOOTSTRAP_ADMIN_GITHUB_LOGIN` | The login name that becomes admin on its first sign-in |
 | `KAMAL_VERSION` | The deployed revision. Used to spot drift against the worker |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | Web Push. Without them the feature is absent: no button, no delivery |
+| `VAPID_SUBJECT` | Where a push service reaches you. `mailto:` or `https:` |
 
 `allow_developer_login` belongs to the same list by implication: in development it is
 true, and `/login` then offers a door that skips GitHub. **It must never be true in
@@ -67,6 +69,7 @@ reviewer to the environment turns deployment into a manual approval, if you want
 | `OAUTH_GITHUB_CLIENT_ID` / `OAUTH_GITHUB_CLIENT_SECRET` | GitHub sign-in. **A secret's name cannot start with `GITHUB_`**, so they are stored under another name and copied across in the workflow |
 | `BOOTSTRAP_ADMIN_GITHUB_LOGIN` | The login name that becomes admin on its first sign-in |
 | `RAILS_MASTER_KEY` | The contents of `config/master.key` |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | Web Push, if you want it |
 
 ## Why the deploy job stops the container first
 
@@ -91,6 +94,26 @@ already on the server — and a container that fails to start leaves it down rat
 than falling back to the old one. Both are acceptable here and neither would be if
 this were shared. The way out of both is kamal-proxy bound to a private port, with
 Caddy in front of it; that also gives real HTTP health checks.
+
+## Web Push
+
+A Blueprint arriving for review is the only thing that notifies anyone, and only if
+this is set up. Generate the pair once:
+
+```sh
+bin/rails runner 'k = WebPush.generate_key; puts "public: #{k.public_key}"; puts "private: #{k.private_key}"'
+```
+
+Put them in the environment (the `production` environment's secrets for CI). **Keep
+them.** Replacing the pair invalidates every subscription made against the old one,
+silently — the browsers keep their subscriptions and the notifications stop arriving.
+
+Then open `/admin/blueprints` and press the button. Subscriptions belong to a
+browser, not an account, so each device does it once.
+
+**On iOS it only works from the Home Screen.** Safari does not offer Web Push to an
+ordinary tab, so add the site to the Home Screen and press the button there. The
+button says as much when it finds itself in a tab.
 
 ## opkssh on the VPS
 
