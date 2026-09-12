@@ -17,36 +17,45 @@
 # an attempt; the worker that comes up next picks it back up.
 set -eu
 
-CHECKOUT="${CHECKOUT:-/opt/mcp-coderunner-app}"
-BRANCH="${BRANCH:-main}"
-UNIT="${UNIT:-mcp-coderunner-app-worker}"
-UNIT_DIR="${UNIT_DIR:-/etc/systemd/system}"
+# Everything lives in main(), called on the last line. This script replaces itself
+# with `git reset --hard` while it is running, and sh reads a script as it goes: a
+# file that changes underneath it can carry execution into the middle of a line.
+# Wrapped this way, the whole body is parsed before any of it runs.
+main() {
 
-cd "$CHECKOUT"
+  CHECKOUT="${CHECKOUT:-/opt/mcp-coderunner-app}"
+  BRANCH="${BRANCH:-main}"
+  UNIT="${UNIT:-mcp-coderunner-app-worker}"
+  UNIT_DIR="${UNIT_DIR:-/etc/systemd/system}"
 
-before="$(git rev-parse --short HEAD)"
+  cd "$CHECKOUT"
 
-git fetch --prune origin
-# reset, not pull, so a dirty checkout still converges to one known state
-git reset --hard "origin/${BRANCH}"
+  before="$(git rev-parse --short HEAD)"
 
-after="$(git rev-parse --short HEAD)"
+  git fetch --prune origin
+  # reset, not pull, so a dirty checkout still converges to one known state
+  git reset --hard "origin/${BRANCH}"
 
-if [ "$before" = "$after" ]; then
-  echo "already at ${after}; reinstalling units and restarting"
-fi
+  after="$(git rev-parse --short HEAD)"
 
-# Forget this and the drift warning at /admin/workers starts lying
-git rev-parse HEAD > REVISION
+  if [ "$before" = "$after" ]; then
+    echo "already at ${after}; reinstalling units and restarting"
+  fi
 
-for unit in mcp-coderunner-app-worker.service \
-            mcp-coderunner-app-prune.service \
-            mcp-coderunner-app-prune.timer; do
-  install -m 0644 "deploy/${unit}" "${UNIT_DIR}/${unit}"
-done
-systemctl daemon-reload
+  # Forget this and the drift warning at /admin/workers starts lying
+  git rev-parse HEAD > REVISION
 
-systemctl restart "$UNIT"
+  for unit in mcp-coderunner-app-worker.service \
+              mcp-coderunner-app-prune.service \
+              mcp-coderunner-app-prune.timer; do
+    install -m 0644 "deploy/${unit}" "${UNIT_DIR}/${unit}"
+  done
+  systemctl daemon-reload
 
-echo "restarted: ${before} -> ${after}"
-systemctl --no-pager --lines=0 status "$UNIT" || true
+  systemctl restart "$UNIT"
+
+  echo "restarted: ${before} -> ${after}"
+  systemctl --no-pager --lines=0 status "$UNIT" || true
+}
+
+main "$@"
