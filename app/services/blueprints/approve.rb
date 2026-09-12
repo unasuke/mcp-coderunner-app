@@ -12,10 +12,20 @@ module Blueprints
   # before review would mean running an unreviewed Dockerfile with network access,
   # and review is the only thing guarding that phase (design 9.2).
   class Approve
-    # Runs under the default entrypoint, so this proves the image builds, starts,
-    # and has the ruby the rest of the system assumes. The output is worth keeping
-    # around: it says which ruby the environment actually ends up with.
-    VERIFICATION_SCRIPT = "puts RUBY_DESCRIPTION\n"
+    # Not the default `ruby` entrypoint: a Blueprint does not have to be a Ruby
+    # image, and asking one that isn't for `ruby` would report a broken environment
+    # that is perfectly sound. A shell is the weakest thing there is to ask for, and
+    # what it prints identifies the image rather than any language in it.
+    #
+    # An image with no shell at all (distroless, scratch) fails this. The result says
+    # so and nothing is blocked by it -- submitting still works, and a job that names
+    # its own entrypoint is unaffected.
+    VERIFICATION_SCRIPT = <<~SH
+      uname -sm
+      cat /etc/os-release 2>/dev/null | head -1
+    SH
+
+    VERIFICATION_ENTRYPOINT = [ "sh", "/work/script.rb" ].freeze
 
     Result = Data.define(:verification_job, :released_jobs)
 
@@ -27,6 +37,7 @@ module Blueprints
           verification_job: Jobs::Submit.call(
             blueprint_ref: blueprint.digest,
             script: VERIFICATION_SCRIPT,
+            entrypoint: VERIFICATION_ENTRYPOINT,
             user: by
           ))
       end

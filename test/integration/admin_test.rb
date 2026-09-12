@@ -99,6 +99,10 @@ class AdminTest < ActionDispatch::IntegrationTest
     assert_equal "default", job.profile
     assert_equal "unasuke", job.requested_by.login
     assert_equal Blueprints::Approve::VERIFICATION_SCRIPT, job.script
+
+    # Under a shell, not under ruby: a Blueprint is not required to be a Ruby image
+    assert_equal [ "sh", "/work/script.rb" ], job.entrypoint_or_default
+    refute_includes job.script, "RUBY"
   end
 
   # The design has a job on an approved digest go straight through. A job submitted
