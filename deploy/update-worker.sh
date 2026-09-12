@@ -14,6 +14,17 @@ set -eu
 CHECKOUT="${CHECKOUT:-/opt/mcp-coderunner-app}"
 BRANCH="${BRANCH:-main}"
 UNIT="${UNIT:-mcp-coderunner-app-worker}"
+WORKER_USER="${WORKER_USER:-mcp-coderunner-app}"
+WORKER_ENV="${WORKER_ENV:-/etc/mcp-coderunner-app/worker.env}"
+
+# The daemon is rootless and belongs to the worker's account, so root's docker
+# reaches nothing. Ask as that user, with the socket the units are given.
+running_jobs() {
+  [ -r "$WORKER_ENV" ] || return 0
+
+  sudo -u "$WORKER_USER" env "$(grep -s ^DOCKER_HOST= "$WORKER_ENV")" \
+    docker ps -q --filter label=mcp-coderunner-app.job 2>/dev/null | wc -l
+}
 
 cd "$CHECKOUT"
 
@@ -32,8 +43,8 @@ fi
 # Forget this and the drift warning at /admin/workers starts lying
 git rev-parse HEAD > REVISION
 
-running="$(docker ps -q --filter label=mcp-coderunner-app.job | wc -l)"
-if [ "$running" -gt 0 ]; then
+running="$(running_jobs)"
+if [ "${running:-0}" -gt 0 ]; then
   echo "interrupting ${running} running job(s); they return to the queue"
 fi
 
