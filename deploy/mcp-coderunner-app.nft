@@ -1,0 +1,31 @@
+# The LAN block, which is the one thing in this design that cannot be allowed to
+# slip. Job containers run with --network none and reach nothing; what this covers
+# is the build phase, which is on the network by design.
+#
+# @UID@ is the worker account's uid, filled in when this is applied:
+#
+#   sed "s/@UID@/$(id -u mcp-coderunner-app)/" deploy/mcp-coderunner-app.nft | sudo nft -f -
+#
+# Matching on the uid rather than an interface is what a rootless daemon calls for.
+# There is no bridge to filter: rootlesskit carries the container's traffic out
+# through the host's own stack, so it leaves as traffic from that account. A rule
+# written against docker0 matches nothing here and protects nothing.
+#
+# The worker itself runs as that account and has no business on the LAN either, so
+# being caught by the same rule costs nothing.
+#
+# Loopback is deliberately not dropped: rootlesskit and the local sockets live there.
+
+table inet mcp-coderunner-app
+delete table inet mcp-coderunner-app
+
+table inet mcp-coderunner-app {
+  chain output {
+    type filter hook output priority 0; policy accept;
+
+    # 169.254.0.0/16 is link-local, which is also where a cloud image's metadata
+    # service answers
+    meta skuid @UID@ ip daddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16 } drop
+    meta skuid @UID@ ip6 daddr { fc00::/7, fe80::/10 } drop
+  }
+}

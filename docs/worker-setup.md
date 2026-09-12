@@ -68,8 +68,9 @@ grep ^mcp-coderunner-app: /etc/subuid /etc/subgid   # must not come back empty
 sudo loginctl enable-linger mcp-coderunner-app
 
 # Rootless is delegated memory and pids by default and nothing else. Without cpu,
-# --cpus and the cpuset that keeps bench exclusive are accepted and ignored, and the
-# worker goes on reporting applied_limits that nothing is applying.
+# --cpus is accepted and ignored, and the worker goes on reporting applied_limits
+# that nothing is applying. (bench does not need the cpuset controller: what keeps
+# an exclusive job alone is Jobs::Claim and JobRegistry, not pinning.)
 sudo install -d /etc/systemd/system/user@.service.d
 printf '[Service]\nDelegate=cpu cpuset io memory pids\n' \
   | sudo tee /etc/systemd/system/user@.service.d/delegate.conf
@@ -160,6 +161,11 @@ sudo sed -i 's,^runtime_dir:.*,runtime_dir: /var/lib/mcp-coderunner-app/work,' \
   /etc/mcp-coderunner-app/config.yml
 ```
 
+**Apply the firewall before building anything real.** The rule the rootful setup used
+was written against `docker0` and does nothing once the daemon is rootless, so the LAN
+block is gone until section 4 is done — and nothing says so. Do that section now, run
+its `nc` check, and only then let a Blueprint build.
+
 Images built by the rootful daemon stay with it and are invisible to the rootless
 one, so the first job rebuilds its Blueprint.
 
@@ -202,23 +208,31 @@ reachability into the LAN, and inbound — and that does not change.
 
 **Rootless changes how this has to be written.** There is no docker bridge to filter
 on: rootlesskit carries the container's traffic through the host's own network stack,
-so to the firewall it is traffic from the `mcp-coderunner-app` user. Match that, in
-the output hook. A rule written against `docker0` — which is what a rootful setup
-uses, and what this file said before — matches nothing here and protects nothing.
+so to the firewall it is traffic from the `mcp-coderunner-app` user. A rule written
+against `docker0` — which is what a rootful setup uses — matches nothing here and
+protects nothing.
 
-```
-table inet mcp-coderunner-app {
-  chain output {
-    type filter hook output priority 0; policy accept;
-    meta skuid <uid> ip daddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } drop
-    meta skuid <uid> ip6 daddr { fc00::/7, fe80::/10 } drop
-  }
-}
+The table is `deploy/mcp-coderunner-app.nft` in the checkout, with the uid left as a
+placeholder. Check it first, then apply it:
+
+```sh
+uid=$(id -u mcp-coderunner-app)
+render() { sed "s/@UID@/${uid}/" /opt/mcp-coderunner-app/deploy/mcp-coderunner-app.nft; }
+
+render | sudo nft -c -f -      # parses it and changes nothing
+render | sudo nft -f -
+sudo nft list table inet mcp-coderunner-app
 ```
 
-The worker runs as that user too, and has no reason to reach the LAN, so catching it
-in the same rule costs nothing. Check it from a container, against something on the
-LAN that answers:
+Applying it twice is safe: the file deletes the table before defining it. If an older
+table is still there under another name (one written against `docker0`, say), delete
+that too.
+
+To survive a reboot, add `include "/etc/nftables.conf.d/mcp-coderunner-app.nft"` to
+`/etc/nftables.conf` after copying the rendered file there, and
+`sudo systemctl enable --now nftables`.
+
+Check it from a container, against something on the LAN that answers:
 
 ```sh
 uid=$(id -u mcp-coderunner-app)

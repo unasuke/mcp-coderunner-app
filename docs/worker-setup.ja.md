@@ -63,9 +63,10 @@ grep ^mcp-coderunner-app: /etc/subuid /etc/subgid   # 空で返らないこと
 # daemon は systemd の *user* サービスなので、ログインしていなくても user manager が動く必要がある
 sudo loginctl enable-linger mcp-coderunner-app
 
-# rootless に既定で委譲されるのは memory と pids だけ。cpu が無いと --cpus も
-# bench を排他にする cpuset も「受け付けて無視」になり、適用していない
-# applied_limits をワーカーが報告し続けることになる
+# rootless に既定で委譲されるのは memory と pids だけ。cpu が無いと --cpus が
+# 「受け付けて無視」になり、適用していない applied_limits をワーカーが報告し続ける。
+# （bench に cpuset は要らない。排他は Jobs::Claim と JobRegistry が担保していて、
+#   ピン留めではない）
 sudo install -d /etc/systemd/system/user@.service.d
 printf '[Service]\nDelegate=cpu cpuset io memory pids\n' \
   | sudo tee /etc/systemd/system/user@.service.d/delegate.conf
@@ -150,6 +151,11 @@ sudo sed -i 's,^runtime_dir:.*,runtime_dir: /var/lib/mcp-coderunner-app/work,' \
   /etc/mcp-coderunner-app/config.yml
 ```
 
+**本物のビルドを走らせる前に firewall を当てること。** rootful 時代のルールは `docker0` を
+見ており、daemon が rootless になった時点で何もしない。**4 章を済ませるまで LAN 遮断は
+外れたままで、しかもそれを知らせるものは何も無い。**先に 4 章を済ませ、`nc` の確認を
+通してから Blueprint をビルドする。
+
 rootful の daemon が作ったイメージは rootless からは見えないので、最初のジョブは
 Blueprint の再ビルドから始まる。
 
@@ -190,21 +196,27 @@ VM 自身の outbound を絞らないのは、**build フェーズに外向き�
 
 **rootless では書き方が変わる。**フィルタすべきブリッジが無い。rootlesskit が
 コンテナの通信をホストのネットワークスタックから出すので、firewall から見ると
-`mcp-coderunner-app` ユーザーの通信になる。output フックで uid を見る。
-`docker0` に対して書いたルール（rootful 用で、以前ここに書いてあったもの）は
+`mcp-coderunner-app` ユーザーの通信になる。`docker0` に対して書いたルール（rootful 用）は
 **何にも一致せず、何も守らない**。
 
-```
-table inet mcp-coderunner-app {
-  chain output {
-    type filter hook output priority 0; policy accept;
-    meta skuid <uid> ip daddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } drop
-    meta skuid <uid> ip6 daddr { fc00::/7, fe80::/10 } drop
-  }
-}
+表は checkout の `deploy/mcp-coderunner-app.nft` にある。uid はプレースホルダなので、
+差し替えてから当てる。先に構文だけ確かめること。
+
+```sh
+uid=$(id -u mcp-coderunner-app)
+render() { sed "s/@UID@/${uid}/" /opt/mcp-coderunner-app/deploy/mcp-coderunner-app.nft; }
+
+render | sudo nft -c -f -      # 構文の確認だけ。何も変えない
+render | sudo nft -f -
+sudo nft list table inet mcp-coderunner-app
 ```
 
-ワーカー自身も同じユーザーで動くが、LAN に用は無いので巻き込んで構わない。
+二度当てても壊れない（ファイルの先頭で table を消してから定義している）。
+別名で古い表（`docker0` を見るもの）が残っていたら、それも消す。
+
+再起動後も残すには、描画したファイルを `/etc/nftables.conf.d/` に置き、
+`/etc/nftables.conf` に `include` を足して `sudo systemctl enable --now nftables`。
+
 LAN 上の応答するホストに対して、コンテナから確かめる。
 
 ```sh
