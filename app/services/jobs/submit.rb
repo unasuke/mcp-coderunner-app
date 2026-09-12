@@ -73,9 +73,7 @@ module Jobs
     end
 
     def review_needed?(blueprint)
-      !blueprint.approved? ||
-        Protocol::ResourceProfile.requires_approval?(@profile) ||
-        @script.bytesize > Job.review_script_bytes
+      !blueprint.approved? || Job.review_required?(profile: @profile, script: @script)
     end
   end
 end

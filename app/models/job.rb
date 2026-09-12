@@ -51,6 +51,19 @@ class Job < ApplicationRecord
   # anything but cancel. A job cannot be approved before its Blueprint is, so that
   # no path leads to execution without someone having read the Dockerfile (naming
   # a digest is enough to create a job against an unapproved Blueprint)
+  # What makes a job need a human quite apart from its environment: a profile that
+  # asks for one, or a script too large to have been written to try something out.
+  # An unapproved Blueprint also holds a job back, but that reason can go away on
+  # its own -- these two cannot.
+  def self.review_required?(profile:, script:)
+    Protocol::ResourceProfile.requires_approval?(profile) ||
+      script.to_s.bytesize > review_script_bytes
+  end
+
+  def review_required_on_its_own?
+    self.class.review_required?(profile:, script:)
+  end
+
   def approvable?
     pending_review? && blueprint.approved?
   end

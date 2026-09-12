@@ -17,16 +17,31 @@ module Blueprints
     # around: it says which ruby the environment actually ends up with.
     VERIFICATION_SCRIPT = "puts RUBY_DESCRIPTION\n"
 
+    Result = Data.define(:verification_job, :released_jobs)
+
     def self.call(blueprint:, by:)
       Blueprint.transaction do
         blueprint.approve!(by:)
 
-        Jobs::Submit.call(
-          blueprint_ref: blueprint.digest,
-          script: VERIFICATION_SCRIPT,
-          user: by
-        )
+        Result.new(released_jobs: release_waiting_jobs(blueprint, by),
+          verification_job: Jobs::Submit.call(
+            blueprint_ref: blueprint.digest,
+            script: VERIFICATION_SCRIPT,
+            user: by
+          ))
       end
     end
+
+    # A job submitted against a Blueprint nobody had reviewed yet is held back by
+    # that and nothing else. Approving is the answer to it, so asking for the job to
+    # be approved too would be asking the same question twice -- and the design says
+    # a job on an approved digest goes straight through. Jobs that a human owes an
+    # answer to for their own sake (bench, an outsized script) stay where they are.
+    def self.release_waiting_jobs(blueprint, by)
+      blueprint.jobs.pending_review.reject(&:review_required_on_its_own?).each do |job|
+        job.approve!(by:)
+      end
+    end
+    private_class_method :release_waiting_jobs
   end
 end

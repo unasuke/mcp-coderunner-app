@@ -20,8 +20,10 @@ class AdminConsoleTest < ApplicationSystemTestCase
   end
 
   # Approval runs one way, Blueprint before Job, and the order cannot be skipped.
-  # This watches that the screen allows no other sequence either
-  test "a job stays unapprovable until its blueprint is approved" do
+  # Approving the environment is also the answer for the job waiting on it, so
+  # there is no second approval to give -- the job is queued by the time the page
+  # comes back
+  test "a job waiting on an unapproved blueprint is released by approving it" do
     blueprint = create_blueprint
     job = Job.create!(blueprint:, script: "puts 1\n", profile: "default")
 
@@ -43,9 +45,9 @@ class AdminConsoleTest < ApplicationSystemTestCase
 
     click_on "ジョブ"
     click_on job.id.to_s
-    click_on "承認して実行する"
 
     assert_text "queued"
+    assert_no_button "承認して実行する"
     assert_predicate job.reload, :queued?
   end
 

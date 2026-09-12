@@ -101,6 +101,34 @@ class AdminTest < ActionDispatch::IntegrationTest
     assert_equal Blueprints::Approve::VERIFICATION_SCRIPT, job.script
   end
 
+  # The design has a job on an approved digest go straight through. A job submitted
+  # before the review was done is held back by that and nothing else, so approving
+  # is the answer to it -- being asked to approve the job as well is the same
+  # question twice
+  test "approving a blueprint releases the jobs that were waiting on it" do
+    waiting = Job.create!(blueprint: @blueprint, script: "puts 1", profile: "default")
+    sign_in
+
+    post approve_admin_blueprint_path(@blueprint)
+
+    assert_predicate waiting.reload, :queued?
+    assert_equal "unasuke", waiting.approved_by.login
+  end
+
+  # bench asks for a human on its own account, and so does a script too large to
+  # have been written to try something out. Neither reason goes away with approval
+  test "a job that needs review for itself keeps waiting" do
+    bench = Job.create!(blueprint: @blueprint, script: "puts 1", profile: "bench")
+    huge = Job.create!(blueprint: @blueprint, profile: "default",
+      script: "x" * (Job.review_script_bytes + 1))
+    sign_in
+
+    post approve_admin_blueprint_path(@blueprint)
+
+    assert_predicate bench.reload, :pending_review?
+    assert_predicate huge.reload, :pending_review?
+  end
+
   # Approval is a judgement about content and stands on its own. Rejecting one does
   # not queue anything
   test "rejecting a blueprint queues nothing" do

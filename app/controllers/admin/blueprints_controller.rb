@@ -15,9 +15,8 @@ module Admin
     def approve
       return redirect_to(admin_blueprint_path(@blueprint), alert: refusal) unless @blueprint.reviewable?
 
-      job = Blueprints::Approve.call(blueprint: @blueprint, by: current_user)
-      redirect_to admin_blueprint_path(@blueprint),
-        notice: "承認しました。ビルドの確認にジョブ ##{job.id} を投入しました"
+      result = Blueprints::Approve.call(blueprint: @blueprint, by: current_user)
+      redirect_to admin_blueprint_path(@blueprint), notice: approval_notice(result)
     end
 
     def reject
@@ -36,6 +35,13 @@ module Admin
     end
 
     private
+
+    def approval_notice(result)
+      notice = "承認しました。ビルドの確認にジョブ ##{result.verification_job.id} を投入しました"
+      return notice if result.released_jobs.empty?
+
+      "#{notice}。この実行環境を待っていたジョブ #{result.released_jobs.size} 件も実行対象にしました"
+    end
 
     # Something already turned down or revoked cannot be walked back to approved by a POST
     def refusal
