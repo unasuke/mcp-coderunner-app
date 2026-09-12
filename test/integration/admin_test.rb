@@ -37,6 +37,19 @@ class AdminTest < ActionDispatch::IntegrationTest
     assert_nil Current.user
   end
 
+  # Without an expiry the cookie lives only as long as the browser session, and iOS
+  # Safari ends those whenever it feels like reclaiming the tab -- which read as
+  # being signed out on nearly every visit
+  test "the session cookie outlives the browser session" do
+    sign_in
+
+    set_cookie = response.headers["Set-Cookie"].to_s
+
+    assert_match(/session_token=/, set_cookie)
+    assert_match(/expires=/i, set_cookie)
+    assert_match(/httponly/i, set_cookie)
+  end
+
   test "the first login becomes admin when it matches the bootstrap login" do
     Rails.configuration.x.mcp_coderunner_app.bootstrap_admin_login = "unasuke"
     OmniAuth.config.mock_auth[:github] = OmniAuth::AuthHash.new(

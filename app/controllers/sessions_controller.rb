@@ -55,7 +55,10 @@ class SessionsController < ApplicationController
     user.save!
 
     _session, token = Session.issue!(user:, user_agent: request.user_agent, ip_address: request.remote_ip)
-    cookies.signed[:session_token] = { value: token, httponly: true, same_site: :lax, secure: request.ssl? }
+    cookies.signed[:session_token] = {
+      value: token, httponly: true, same_site: :lax, secure: request.ssl?,
+      expires: Session::COOKIE_LIFETIME.from_now
+    }
 
     redirect_to(session.delete(:return_to) || root_path)
   end
