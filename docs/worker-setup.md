@@ -71,9 +71,11 @@ sudo loginctl enable-linger mcp-coderunner-app
 # --cpus is accepted and ignored, and the worker goes on reporting applied_limits
 # that nothing is applying. (bench does not need the cpuset controller: what keeps
 # an exclusive job alone is Jobs::Claim and JobRegistry, not pinning.)
-sudo install -d /etc/systemd/system/user@.service.d
+# Scoped to this account's manager, not user@.service, which would hand the
+# controllers to every session on the machine
+sudo install -d /etc/systemd/system/user@$(id -u mcp-coderunner-app).service.d
 printf '[Service]\nDelegate=cpu cpuset io memory pids\n' \
-  | sudo tee /etc/systemd/system/user@.service.d/delegate.conf
+  | sudo tee /etc/systemd/system/user@$(id -u mcp-coderunner-app).service.d/delegate.conf
 sudo systemctl daemon-reload
 sudo reboot
 ```
@@ -314,7 +316,7 @@ expire.
 | `image_build_failed` | The build log is at the tail of `job_results.stderr` |
 | repeated 401s | Has the token been revoked (`/admin/workers`)? Did a newline get into `/etc/mcp-coderunner-app/token`? |
 | `unknown flag: --tag` from a build | The docker CLI lost its plugin directory, and `build` is the buildx plugin. `ProtectHome=yes` turns the service's `$HOME/.docker` from missing into unreadable, which is what the CLI cannot take. The unit sets `DOCKER_CONFIG` for this; a unit older than that needs recopying |
-| a job's limits do not match `applied_limits` | The cpu controller is not delegated. Section 3's check says so in one line; the drop-in under `/etc/systemd/system/user@.service.d/` is the fix, and it needs a reboot |
+| a job's limits do not match `applied_limits` | The cpu controller is not delegated. Section 3's check says so in one line; the drop-in under `/etc/systemd/system/user@<uid>.service.d/` is the fix, and it needs a reboot |
 | `Unit docker.service not found` right after the setup tool wrote it | The home in `/etc/passwd` and the `HOME` the tool was given are different directories. See "Coming from the rootful setup" |
 | the setup tool refuses: no subuid/subgid range | `useradd --system` does not allocate them. `sudo usermod --add-subuids 200000-265535 --add-subgids 200000-265535 mcp-coderunner-app`, then restart the user's docker |
 | `Cannot connect to the Docker daemon` | `/etc/mcp-coderunner-app/worker.env` is missing or has the wrong uid, or the user's daemon is not running: `sudo -u mcp-coderunner-app env XDG_RUNTIME_DIR=/run/user/$(id -u mcp-coderunner-app) systemctl --user status docker` |
