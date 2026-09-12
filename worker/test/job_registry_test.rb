@@ -53,6 +53,24 @@ class JobRegistryTest < Minitest::Test
     refute_predicate @registry, :busy?
   end
 
+  # A shutdown wants the job back in the queue; an admin wants it finished as
+  # cancelled. The entry is what remembers which of the two asked
+  def test_a_shutdown_cancel_is_told_apart_from_one_an_admin_asked_for
+    entry = @registry.add(build_payload)
+    entry.cancel!(:shutdown)
+
+    assert_predicate entry, :cancelled?
+    assert_predicate entry, :shutdown?
+  end
+
+  def test_a_cancel_already_asked_for_survives_the_shutdown
+    entry = @registry.add(build_payload)
+    entry.cancel!
+    entry.cancel!(:shutdown)
+
+    refute_predicate entry, :shutdown?
+  end
+
   # An exclusive job does not start until everything else has drained
   def test_alone_is_false_while_another_job_runs
     other = @registry.add(payload(job_id: 1, lease_id: 1))

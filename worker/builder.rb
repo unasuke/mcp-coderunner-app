@@ -25,19 +25,22 @@ module Worker
       "#{Protocol::Constants::IMAGE_REPO}:#{digest}"
     end
 
-    def ensure_image!(digest:, dockerfile:, files:)
+    def ensure_image!(digest:, dockerfile:, files:, cancelled: nil)
       tag = image_tag(digest)
       return tag if Docker.image_exist?(tag)
 
-      build!(tag:, dockerfile:, files:)
+      build!(tag:, dockerfile:, files:, cancelled:)
       tag
     end
 
-    def build!(tag:, dockerfile:, files:)
+    # cancelled is carried down to the build itself. It is the long part of a job,
+    # and a worker that has been told to stop cannot wait it out
+    def build!(tag:, dockerfile:, files:, cancelled: nil)
       Dir.mktmpdir("mcp-coderunner-app-build") do |dir|
         write_context(dir, dockerfile, files)
 
-        result = Docker.run("build", "--tag", tag, "--file", File.join(dir, "Dockerfile"), dir)
+        result = Docker.run("build", "--tag", tag, "--file", File.join(dir, "Dockerfile"), dir,
+          cancelled:)
         unless result.success?
           raise BuildFailed, tail(result.stderr)
         end

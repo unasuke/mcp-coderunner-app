@@ -36,14 +36,16 @@ module Worker
       tag = @builder.ensure_image!(
         digest: payload.blueprint.digest,
         dockerfile: payload.blueprint.dockerfile,
-        files: payload.blueprint.files
+        files: payload.blueprint.files,
+        cancelled:
       )
 
       execute(payload, applied:, tag:, cancelled:, started:)
     rescue PolicyRejected => e
       failure("policy_rejected", e, applied, started)
     rescue BuildFailed => e
-      failure("image_build_failed", e, applied, started)
+      # A build cut short on the way out is not a broken Dockerfile
+      cancelled&.call ? cancelled_result(applied, started) : failure("image_build_failed", e, applied, started)
     rescue Error, SystemCallError, JSON::ParserError => e
       failure("worker_error", e, applied, started)
     rescue StandardError => e
@@ -228,6 +230,14 @@ module Worker
       head = text.byteslice(0, half)
       tail = text.byteslice(-half, half)
       [ "#{head}#{TRUNCATION_MARKER}#{tail}".scrub, true ]
+    end
+
+    def cancelled_result(applied, started)
+      Protocol::JobResult.new(
+        termination_reason: "cancelled",
+        duration_ms: elapsed_ms(started),
+        applied_limits: applied || {}
+      )
     end
 
     def failure(reason, error, applied, started)

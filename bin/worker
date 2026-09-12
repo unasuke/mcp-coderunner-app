@@ -178,6 +178,14 @@ module Worker
       entry.stop_heartbeat!
       heartbeat.join(5)
 
+      # Shutting down is not an answer about the job. Leave the lease alone and let
+      # /deregister put it back in the queue, which costs no attempt -- an update
+      # should not spend a job. Reporting "cancelled" here would end it instead.
+      if entry.shutdown?
+        log("job.abandoned", job_id: payload.job_id, reason: result.termination_reason)
+        return
+      end
+
       accepted = result_client.post_result(
         job_id: payload.job_id, lease_token: payload.lease_token, result:
       )
@@ -244,7 +252,7 @@ module Worker
       return if entries.empty?
 
       log("shutdown.cancelling", jobs: entries.size)
-      entries.each(&:cancel!)
+      entries.each { |entry| entry.cancel!(:shutdown) }
 
       deadline = monotonic + SHUTDOWN_GRACE
       entries.each { |entry| entry.thread&.join([ deadline - monotonic, 0 ].max) }

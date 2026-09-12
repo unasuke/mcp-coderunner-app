@@ -102,6 +102,28 @@ class RunnerTest < Minitest::Test
     assert_equal "4", pair(list, "--cpus")
   end
 
+  # A build killed on the way out is not a broken Dockerfile, and saying
+  # image_build_failed would blame the Blueprint for the worker stopping
+  def test_a_build_cut_short_by_a_cancel_comes_back_as_cancelled
+    builder = Object.new
+    def builder.ensure_image!(**) = raise(Worker::BuildFailed, "terminated")
+
+    result = Worker::Runner.new(policy: @policy, builder:)
+      .call(build_payload, cancelled: -> { true })
+
+    assert_equal "cancelled", result.termination_reason
+  end
+
+  def test_a_build_that_fails_on_its_own_is_still_image_build_failed
+    builder = Object.new
+    def builder.ensure_image!(**) = raise(Worker::BuildFailed, "no such package")
+
+    result = Worker::Runner.new(policy: @policy, builder:)
+      .call(build_payload, cancelled: -> { false })
+
+    assert_equal "image_build_failed", result.termination_reason
+  end
+
   # Even when a bug in the worker lets an exception out, a result always goes back
   def test_unexpected_errors_come_back_as_worker_error
     builder = Object.new

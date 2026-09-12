@@ -17,14 +17,25 @@ module Worker
       def initialize(payload)
         @payload = payload
         @cancelled = false
+        @cancel_reason = nil
         @beating = true
       end
 
       def job_id = payload.job_id
       def lease_id = payload.lease_id
 
-      def cancel! = @cancelled = true
+      # Why it was cancelled decides what happens to the job. An admin asking for it
+      # wants the job finished as cancelled; the worker shutting down wants the job
+      # back in the queue, so it holds the lease and lets /deregister requeue it.
+      # The first reason wins: someone who cancelled before the shutdown still gets
+      # the answer they asked for.
+      def cancel!(reason = :requested)
+        @cancel_reason ||= reason
+        @cancelled = true
+      end
+
       def cancelled? = @cancelled
+      def shutdown? = @cancel_reason == :shutdown
       def stop_heartbeat! = @beating = false
       def beating? = @beating
 
