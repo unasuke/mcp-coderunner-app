@@ -33,10 +33,15 @@
           </td>
           <td>
             <div class="actions">
+              <%# The last admin cannot be demoted: nothing here could be approved afterwards %>
               <% User.roles.keys.reject { |role| role == user.role }.each do |role| %>
+                <% next unless user.demotable_to?(role) %>
                 <%= button_to role_action_label(role), admin_user_path(user, role:), method: :patch,
                       class: ("btn-go" if role == "member"),
                       form: { data: { turbo_confirm: ("#{user.login} を承認待ちに戻します。開いているセッションも切れます。" if role == "pending") } } %>
+              <% end %>
+              <% if user.last_admin? %>
+                <span class="dim">最後の admin のため変更できません</span>
               <% end %>
             </div>
           </td>

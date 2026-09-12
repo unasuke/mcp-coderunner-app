@@ -317,4 +317,37 @@ class AdminTest < ActionDispatch::IntegrationTest
     assert_predicate other.reload, :pending?
     assert_equal 0, other.sessions.count
   end
+
+  # Demoting the only admin closes the door from the inside: approving users,
+  # Blueprints and jobs all need one, and bootstrap_admin_login only applies to an
+  # account's first sign-in. The way back would be a console on the server
+  test "the only admin cannot be demoted" do
+    sign_in
+
+    [ "pending", "member" ].each do |role|
+      patch admin_user_path(User.find_by(login: "unasuke"), role:)
+
+      assert_predicate User.find_by(login: "unasuke"), :admin?
+      assert_match(/最後の admin/, flash[:alert])
+    end
+  end
+
+  test "the buttons for it are not on the page either" do
+    sign_in
+
+    get admin_users_path
+
+    assert_response :success
+    assert_no_match(/承認待ちに戻す/, response.body)
+    assert_match(/最後の admin のため変更できません/, response.body)
+  end
+
+  test "an admin can be demoted once another one exists" do
+    sign_in
+    User.create!(github_uid: "2", login: "someone", role: :admin)
+
+    patch admin_user_path(User.find_by(login: "unasuke"), role: "member")
+
+    assert_predicate User.find_by(login: "unasuke"), :member?
+  end
 end

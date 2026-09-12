@@ -13,6 +13,9 @@ module Admin
 
       user.approve!(by: current_user, role:)
       redirect_to admin_users_path, notice: "#{user.login} を #{role} にしました"
+    rescue User::LastAdmin
+      redirect_to admin_users_path,
+        alert: "#{user.login} は最後の admin です。先に別の admin を立ててください"
     end
   end
 end
