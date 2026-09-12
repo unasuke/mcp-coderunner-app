@@ -42,7 +42,9 @@ shared:
   vapid_public_key: <%= ENV["VAPID_PUBLIC_KEY"] %>
   vapid_private_key: <%= ENV["VAPID_PRIVATE_KEY"] %>
   # Where a push service reaches the sender if something is wrong. mailto: or https:
-  vapid_subject: <%= ENV.fetch("VAPID_SUBJECT", "mailto:noreply@example.com") %>
+  # presence, not fetch: the deploy passes this through as an empty string when it
+  # is not configured, and fetch would hand that straight to the push service
+  vapid_subject: <%= ENV["VAPID_SUBJECT"].presence || "mailto:noreply@example.com" %>
 
   # The development door that signs in without going through GitHub.
   # It bypasses the center of the authorization model -- that an authorization code

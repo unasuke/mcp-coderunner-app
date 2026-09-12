@@ -37,7 +37,8 @@ the setting is off, `/auth/developer` does not exist at all.
 | `MCP_CODERUNNER_APP_BASE_URL` | Public URL |
 | `GITHUB_CLIENT_ID` / `BOOTSTRAP_ADMIN_GITHUB_LOGIN` | GitHub sign-in settings |
 | `KAMAL_REGISTRY_PASSWORD` | A ghcr.io token (a classic PAT with `write:packages`) |
-| `GITHUB_CLIENT_SECRET` / `RAILS_MASTER_KEY` | Secrets handed to the container (via `.kamal/secrets`) |
+| `GITHUB_CLIENT_SECRET` / `RAILS_MASTER_KEY` / `VAPID_PRIVATE_KEY` | Secrets handed to the container (via `.kamal/secrets`) |
+| `VAPID_PUBLIC_KEY` / `VAPID_SUBJECT` | Web Push, passed in the clear -- the public key is handed to browsers anyway |
 
 ```sh
 bin/kamal config     # print the resolved configuration; running this first prevents surprises
@@ -104,8 +105,9 @@ this is set up. Generate the pair once:
 bin/rails runner 'k = WebPush.generate_key; puts "public: #{k.public_key}"; puts "private: #{k.private_key}"'
 ```
 
-Put them in the environment (the `production` environment's secrets for CI). **Keep
-them.** Replacing the pair invalidates every subscription made against the old one,
+Put them in the environment: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and
+`VAPID_SUBJECT`, which for CI means the `production` environment's secrets.
+Leaving them unset deploys fine — the feature is simply not there. **Keep them.** Replacing the pair invalidates every subscription made against the old one,
 silently — the browsers keep their subscriptions and the notifications stop arriving.
 
 Then open `/admin/blueprints` and press the button. Subscriptions belong to a

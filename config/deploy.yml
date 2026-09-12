@@ -38,11 +38,19 @@ env:
   secret:
     - RAILS_MASTER_KEY
     - GITHUB_CLIENT_SECRET
+    - VAPID_PRIVATE_KEY
   clear:
     # The hostname and the login name are not in this repository either. CI passes them from secrets
     MCP_CODERUNNER_APP_BASE_URL: <%= ENV.fetch("MCP_CODERUNNER_APP_BASE_URL") %>
     GITHUB_CLIENT_ID: <%= ENV.fetch("GITHUB_CLIENT_ID") %>
     BOOTSTRAP_ADMIN_GITHUB_LOGIN: <%= ENV.fetch("BOOTSTRAP_ADMIN_GITHUB_LOGIN") %>
+
+    # Web Push. The public key is handed to browsers, so it is not a secret; the
+    # private one is, and comes through .kamal/secrets. Rendered quoted and always
+    # present: an empty value would reach Kamal as nil, which it refuses, and the
+    # application reads blank as "push is not set up"
+    VAPID_PUBLIC_KEY: <%= ENV.fetch("VAPID_PUBLIC_KEY", "").inspect %>
+    VAPID_SUBJECT: <%= ENV.fetch("VAPID_SUBJECT", "").inspect %>
 
     # A worker holds one thread for a 25-second long poll. Leave room for the number
     # of worker instances, plus the browser and MCP
