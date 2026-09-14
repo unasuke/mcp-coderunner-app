@@ -37,8 +37,8 @@ the setting is off, `/auth/developer` does not exist at all.
 | `MCP_CODERUNNER_APP_BASE_URL` | Public URL |
 | `GITHUB_CLIENT_ID` / `BOOTSTRAP_ADMIN_GITHUB_LOGIN` | GitHub sign-in settings |
 | `KAMAL_REGISTRY_PASSWORD` | A ghcr.io token (a classic PAT with `write:packages`) |
-| `GITHUB_CLIENT_SECRET` / `RAILS_MASTER_KEY` / `VAPID_PRIVATE_KEY` | Secrets handed to the container (via `.kamal/secrets`) |
-| `VAPID_PUBLIC_KEY` / `VAPID_SUBJECT` | Web Push, passed in the clear -- the public key is handed to browsers anyway |
+| `GITHUB_CLIENT_SECRET` / `RAILS_MASTER_KEY` / `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | Secrets handed to the container (via `.kamal/secrets`) |
+| `VAPID_SUBJECT` | Web Push, if you want one other than the public URL |
 
 ```sh
 bin/kamal config     # print the resolved configuration; running this first prevents surprises
