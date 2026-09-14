@@ -10,19 +10,45 @@ servers:
   web:
     hosts:
       - <%= ENV.fetch("DEPLOY_HOST") %>
-    # An existing Caddy owns 80/443, so kamal-proxy is not used. Turning it off is
-    # said at the role level (a top-level proxy: configures the proxy itself)
-    proxy: false
-    options:
-      publish: [ "127.0.0.1:7000:80" ]
   # job:
   #   hosts:
   #     - 192.168.0.1
   #   cmd: bin/jobs
 
-# The container publishes to a fixed port on localhost, and Caddy picks it up with
-# reverse_proxy localhost:7000. Certificates are left to Caddy's automatic HTTPS
-# （deploy/Caddyfile.example）。
+# Requests travel Caddy (80/443, TLS) -> kamal-proxy on 127.0.0.1:8080 -> the
+# container. Certificates are left to Caddy's automatic HTTPS (deploy/Caddyfile.example).
+# kamal-proxy boots the new container, waits for /up, and only then retires the old
+# one, so a deploy does not go dark and a container that fails to start leaves the
+# old one serving
+proxy:
+  # Routed by Host, taken from the public URL so the hostname stays out of this
+  # repository. Caddy passes Host through unchanged, so another Kamal app on the same
+  # VPS needs no change to the Caddyfile
+  host: <%= URI(ENV.fetch("MCP_CODERUNNER_APP_BASE_URL")).host %>
+  # Thruster (EXPOSE 80 in the Dockerfile)
+  app_port: 80
+  # TLS ends at Caddy
+  ssl: false
+  # Already the default without ssl, said out loud: this sits behind Caddy and trusts
+  # its X-Forwarded-For. Caddy, with no trusted_proxies, replaces whatever a client
+  # sent with the address it saw, so nothing claimed survives to here
+  forward_headers: true
+  # The worker's /lease holds for up to 25 seconds (Protocol::Constants::LEASE_WAIT),
+  # and the default of 30 leaves too thin a margin
+  response_timeout: 60
+
+  # How kamal-proxy itself is booted. This belongs to the host, not the app: the
+  # proxy keeps running with whichever values booted it first, and changing them
+  # takes `kamal proxy reboot`, which takes down every Kamal app on the host meanwhile.
+  # This app was the first on the VPS, so these values are the reference; another
+  # Kamal app added later must carry the same ones
+  run:
+    http_port: 8080
+    # Never served, but the default of 443 would collide with Caddy
+    https_port: 8443
+    # Docker publishes ports ahead of the firewall's INPUT rules, so anything but
+    # loopback would expose 8080 to the internet
+    bind_ips: [ 127.0.0.1 ]
 
 # The image is built locally or in CI and pushed; the server only pulls.
 # Nothing is built on the VPS.
