@@ -6,7 +6,7 @@ updates:
   - package-ecosystem: bundler
     directory: "/"
     schedule:
-      interval: weekly
+      interval: daily
     open-pull-requests-limit: 10
     groups:
       # A pull request each only adds reading. Keep separate what can actually break
