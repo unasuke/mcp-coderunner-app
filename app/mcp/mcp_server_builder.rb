@@ -20,6 +20,7 @@ module McpServerBuilder
 
     実行環境（Blueprint）は人間のレビューを通ったものだけが使える。list_blueprints で承認済みを探し、
     無ければ propose_blueprint で提案する。実行は submit_job で投げて get_job で取りに行く。
+    get_job は終わるまで待ってから返るので、間を空けずに呼んでよい。
     実行コンテナはネットワークに出られない。
   TEXT
 

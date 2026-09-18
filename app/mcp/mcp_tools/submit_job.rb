@@ -3,7 +3,7 @@ module McpTools
     tool_name "submit_job"
     description <<~TEXT
       承認済みの Blueprint 上でスクリプトを実行する。すぐには返らず、job_id を返す。
-      結果は get_job で取りに行く。
+      結果は get_job で取りに行く。get_job は終わるまで待ってから返るので、続けて呼べばよい。
 
       blueprint_last_result は、その実行環境で最後に走ったジョブの結果。
       image_build_failed が返っているなら、このジョブも同じ理由で失敗する見込みが高い。

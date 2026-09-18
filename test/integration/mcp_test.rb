@@ -238,6 +238,73 @@ class McpTest < ActionDispatch::IntegrationTest
     assert_equal({ "memory_mb" => 2048 }, payload["applied_limits"])
   end
 
+  # Replaces the sleep between polls for the duration of the block, and counts the polls
+  def with_pause(on_pause = nil)
+    pauses = 0
+    original = McpTools::GetJob.method(:pause)
+    McpTools::GetJob.define_singleton_method(:pause) do
+      pauses += 1
+      on_pause&.call(pauses)
+    end
+    yield
+    pauses
+  ensure
+    McpTools::GetJob.define_singleton_method(:pause, original)
+  end
+
+  def approved_blueprint
+    Blueprint.create!(name: "ready", summary: "y", dockerfile: "FROM b\n",
+      digest: Blueprint.digest_for(dockerfile: "FROM b\n", files: []), state: :approved)
+  end
+
+  test "get_job waits for a running job to finish" do
+    job = Job.create!(blueprint: approved_blueprint, script: "puts 1", profile: "default", state: :running)
+
+    finish_on_third = ->(n) {
+      job.finish_with!(termination_reason: "exited", exit_code: 0, stdout: "1\n", stderr: "",
+        applied_limits: {}) if n == 3
+    }
+
+    payload = nil
+    pauses = with_pause(finish_on_third) { payload, = tool("get_job", { job_id: job.id }) }
+
+    assert_equal 3, pauses
+    assert_equal "finished", payload["state"]
+    assert_equal "1\n", payload["stdout"]
+  end
+
+  test "get_job gives up at the deadline and reports the state as it stands" do
+    job = Job.create!(blueprint: approved_blueprint, script: "puts 1", profile: "default", state: :running)
+
+    payload = nil
+    pauses = with_pause { payload, = tool("get_job", { job_id: job.id, wait_s: 5 }) }
+
+    assert_equal 5, pauses
+    assert_equal "running", payload["state"]
+    assert_nil payload["stdout"]
+  end
+
+  test "get_job does not wait with wait_s 0 or on a job waiting for review" do
+    running = Job.create!(blueprint: approved_blueprint, script: "puts 1", profile: "default", state: :running)
+    pending = Job.create!(blueprint: running.blueprint, script: "puts 1", profile: "bench")
+
+    pauses = with_pause do
+      assert_equal "running", tool("get_job", { job_id: running.id, wait_s: 0 }).first["state"]
+      assert_equal "running", tool("get_job", { job_id: running.id, wait_s: -3 }).first["state"]
+      assert tool("get_job", { job_id: pending.id }).first["review_url"]
+    end
+
+    assert_equal 0, pauses
+  end
+
+  test "get_job caps the wait" do
+    job = Job.create!(blueprint: approved_blueprint, script: "puts 1", profile: "default", state: :queued)
+
+    pauses = with_pause { tool("get_job", { job_id: job.id, wait_s: 600 }) }
+
+    assert_equal McpTools::GetJob::WAIT_S / McpTools::GetJob::POLL_INTERVAL_S, pauses
+  end
+
   # With retention visible in the response, an empty result is not misread as a
   # failed run. Losing the termination reason too would make it indistinguishable
   # from "no result yet"
