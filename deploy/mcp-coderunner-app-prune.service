@@ -9,4 +9,21 @@ WorkingDirectory=/opt/mcp-coderunner-app
 # Same rootless socket the worker talks to
 EnvironmentFile=-/etc/mcp-coderunner-app/worker.env
 
+# `docker builder prune` goes through the buildx plugin, which wants a config
+# directory it can read. Not the worker's own: a RuntimeDirectory is removed when
+# the unit that declares it stops, and this one is a oneshot
+RuntimeDirectory=mcp-coderunner-app-prune
+Environment=DOCKER_CONFIG=%t/mcp-coderunner-app-prune/.docker
+
 ExecStart=/usr/bin/ruby /opt/mcp-coderunner-app/bin/prune --config /etc/mcp-coderunner-app/config.yml
+
+# It runs while jobs do. Losing to them is the right way round
+Nice=10
+IOSchedulingClass=idle
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+PrivateTmp=yes
+
+# Not ProtectHome=yes: it covers /run/user, where the rootless daemon's socket is
+ProtectHome=no

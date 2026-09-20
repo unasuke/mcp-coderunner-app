@@ -20,9 +20,14 @@ module Worker
       "max_concurrency" => 2
     }.freeze
 
+    # The VM's disk is the scarce thing here, not build time. An image is kept
+    # only as long as it is likely to be asked for again; past that a job pays
+    # for one rebuild. build_cache_ttl_hours is BuildKit's own cache, which grows
+    # faster than the images do
     DEFAULT_BUILD = {
-      "cache_ttl_days" => 14,
-      "max_images" => 40
+      "cache_ttl_days" => 3,
+      "max_images" => 10,
+      "build_cache_ttl_hours" => 24
     }.freeze
 
     # Not under /run. The rootless daemon runs inside rootlesskit, which is started
@@ -87,6 +92,7 @@ module Worker
     def max_context_bytes = limits.fetch("max_context_bytes")
     def cache_ttl_days = build.fetch("cache_ttl_days")
     def max_images = build.fetch("max_images")
+    def build_cache_ttl_hours = build.fetch("build_cache_ttl_hours")
 
     # Read what the VPS asked for as a ceiling and trim anything above this
     # worker's own. Only the top is trimmed; the bottom is refused instead.

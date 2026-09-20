@@ -11,5 +11,5 @@ limits:
   max_concurrency: 1
 
 build:
-  cache_ttl_days: 14
-  max_images: 20
+  cache_ttl_days: 3
+  max_images: 10

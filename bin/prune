@@ -1,12 +1,14 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# Clears out built images. Called from systemd's mcp-coderunner-app-prune.timer.
-# Worth having if you pull ruby-head nightly.
+# Clears out what building left behind: images past their TTL, the ones over
+# max_images, dangling layers, stopped job containers and BuildKit's cache.
+# Called from systemd's mcp-coderunner-app-prune.timer, hourly.
 
 root = File.expand_path("..", __dir__)
 $LOAD_PATH.unshift(File.join(root, "lib"), root)
 
+require "json"
 require "optparse"
 require "worker/builder"
 require "worker/policy"
@@ -18,4 +20,8 @@ OptionParser.new do |parser|
 end.parse!(ARGV)
 
 policy = Worker::Policy.load(options[:config])
-Worker::Builder.new(policy:).prune!
+summary = Worker::Builder.new(policy:).prune!
+
+# One line per run, in the same shape the worker logs in. It is what says whether
+# the disk is going to the images, to the build cache, or to neither
+puts JSON.generate({ event: "prune", worker_id: policy.worker_id }.merge(summary))

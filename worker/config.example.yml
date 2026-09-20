@@ -20,6 +20,9 @@ limits:
   max_output_bytes: 262144
   max_concurrency: 2
 
+# Pruned hourly by mcp-coderunner-app-prune.timer. The disk is the scarce thing,
+# not build time: over these an image is dropped and the next job rebuilds it
 build:
-  cache_ttl_days: 14
-  max_images: 40
+  cache_ttl_days: 3
+  max_images: 10
+  build_cache_ttl_hours: 24   # BuildKit's own cache, kept shorter than the images

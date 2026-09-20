@@ -16,6 +16,10 @@ module Worker
   class Builder
     STDERR_TAIL_BYTES = 8192
 
+    # How long a stopped job container is left alone before prune takes it. Longer
+    # than any job may run, so a container still being read from is never taken
+    CONTAINER_GRACE_HOURS = 1
+
     def initialize(policy:, logger: nil)
       @policy = policy
       @logger = logger
@@ -51,14 +55,41 @@ module Worker
 
     # Kept in hand with cache_ttl_days and max_images. Worth having if you pull
     # ruby-head nightly.
+    #
+    # The tagged images are the smaller half of what building leaves on the disk.
+    # A rebuild of the same tag leaves the image it replaced dangling, where the
+    # tag listing cannot see it; BuildKit keeps a cache of its own; and a worker
+    # that was killed rather than stopped leaves its job containers behind. The
+    # daemon is rootless and this account's alone, so nothing else on the VM is
+    # holding any of it.
     def prune!(now: Time.now)
+      images = prunable_images(now:)
+      images.each { |image| Docker.run("image", "rm", "--force", image.fetch(:id)) }
+
+      # Only stopped containers are collected, and only ones old enough that no
+      # runner can still be reading their output -- a job lives max_timeout_s
+      containers = Docker.run("container", "prune", "--force",
+        "--filter", "label=#{Protocol::Constants::CONTAINER_LABEL}",
+        "--filter", "until=#{CONTAINER_GRACE_HOURS}h")
+      dangling = Docker.run("image", "prune", "--force")
+      build_cache = Docker.run("builder", "prune", "--force", "--all",
+        "--filter", "until=#{@policy.build_cache_ttl_hours}h")
+
+      {
+        images: images.size,
+        containers: reclaimed(containers),
+        dangling: reclaimed(dangling),
+        build_cache: reclaimed(build_cache)
+      }
+    end
+
+    # Past cache_ttl_days, plus whatever is over max_images counting from the oldest
+    def prunable_images(now:)
       images = list_images
       expired = images.select { |image| image.fetch(:created_at) < now - (@policy.cache_ttl_days * 86_400) }
       surplus = images.sort_by { |image| image.fetch(:created_at) }.first([ images.size - @policy.max_images, 0 ].max)
 
-      (expired | surplus).each do |image|
-        Docker.run("image", "rm", "--force", image.fetch(:id))
-      end
+      expired | surplus
     end
 
     def list_images
@@ -77,6 +108,12 @@ module Worker
     end
 
     private
+
+    # docker ends a prune with "Total reclaimed space: 1.2GB". Worth carrying into
+    # the log, because the reason for pruning this often is the disk
+    def reclaimed(result)
+      result.stdout[/Total reclaimed space:\s*(\S+)/, 1] || "0B"
+    end
 
     # blueprint_files carry no mode. The only distinction worth having is whether a
     # file is executable, and allowing an arbitrary mode would let setuid / setgid

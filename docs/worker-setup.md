@@ -287,6 +287,41 @@ When that fails, an ActiveSupport extension (`blank?`, `1.hour`, and the like) h
 its way into the worker or into `lib/protocol`. On a development machine it loads
 anyway, by way of Rails, which is why human review does not catch it.
 
+## Disk
+
+The VM's disk is the tightest resource here, so `mcp-coderunner-app-prune.timer` runs
+**hourly**. A run removes:
+
+- built images past `build.cache_ttl_days`, plus whatever is over `build.max_images`
+  counting from the oldest
+- images a rebuild of the same tag left dangling, which the tag listing cannot see
+- stopped job containers older than an hour -- a worker that was killed rather than
+  stopped leaves them behind
+- BuildKit's build cache past `build.build_cache_ttl_hours`
+
+The tagged images are the smaller half of it; the build cache is usually the larger.
+The daemon is rootless and belongs to `mcp-coderunner-app` alone, so nothing else on
+the VM loses anything here.
+
+```sh
+uid=$(id -u mcp-coderunner-app)
+
+systemctl list-timers mcp-coderunner-app-prune.timer
+sudo systemctl start mcp-coderunner-app-prune.service   # run one now
+journalctl -u mcp-coderunner-app-prune -n 5             # one JSON line per run
+sudo -u mcp-coderunner-app env DOCKER_HOST=unix:///run/user/$uid/docker.sock docker system df
+```
+
+Pruning harder costs build time, not correctness: an image that is gone is rebuilt by
+the next job that asks for it. That trade lives in `build:` in
+`/etc/mcp-coderunner-app/config.yml` -- lower `cache_ttl_days` and `max_images` on a
+small disk, raise them when the same Blueprints keep being rebuilt.
+
+If it still fills up, the space is not in docker. Look at
+`/var/lib/mcp-coderunner-app/work` (the per-job working directories) and at the journal
+next. Growing the disk itself is a host-side operation on the qcow2 image, not something
+the VM can do to itself.
+
 ## Updating
 
 ```sh
@@ -328,3 +363,4 @@ expire.
 | the setup tool refuses: no subuid/subgid range | `useradd --system` does not allocate them. `sudo usermod --add-subuids 200000-265535 --add-subgids 200000-265535 mcp-coderunner-app`, then restart the user's docker |
 | `Cannot connect to the Docker daemon` | `/etc/mcp-coderunner-app/worker.env` is missing or has the wrong uid, or the user's daemon is not running: `sudo -u mcp-coderunner-app env XDG_RUNTIME_DIR=/run/user/$(id -u mcp-coderunner-app) systemctl --user status docker` |
 | containers pile up | `docker ps -a --filter label=mcp-coderunner-app.job`. The unit sweeps them before it starts and after it stops |
+| the disk fills up, or a build fails with `No space left on device` | Run the prune by hand (`sudo systemctl start mcp-coderunner-app-prune.service`) and read its line in the journal. If `build_cache` is where the space went, lower `build.build_cache_ttl_hours`; see "Disk" |

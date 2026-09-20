@@ -268,6 +268,37 @@ ruby -Ilib -I. -e 'require "worker/runner"'
 これが落ちるときは、ワーカーか `lib/protocol` に ActiveSupport の拡張（`blank?`、`1.hour` など）が
 混ざっている。開発機では Rails 経由で通ってしまうので、人間のレビューでは捕まえられない。
 
+## ディスク
+
+このワーカーで一番先に尽きるのはディスクなので、`mcp-coderunner-app-prune.timer` は
+**1 時間ごと**に回る。1 回の実行で消えるのは:
+
+- `build.cache_ttl_days` を過ぎたビルド済みイメージと、`build.max_images` を超えた分（古い順）
+- 同じタグを焼き直したときに残る dangling なイメージ。タグの一覧からは見えない
+- 1 時間以上前に停止したジョブコンテナ。停止ではなく kill されたワーカーが残していく
+- `build.build_cache_ttl_hours` を過ぎた BuildKit のビルドキャッシュ
+
+タグの付いたイメージは容量としては小さいほうで、たいていビルドキャッシュのほうが大きい。
+daemon は rootless で `mcp-coderunner-app` 専用なので、ここで VM の他の何かが巻き込まれることはない。
+
+```sh
+uid=$(id -u mcp-coderunner-app)
+
+systemctl list-timers mcp-coderunner-app-prune.timer
+sudo systemctl start mcp-coderunner-app-prune.service   # 今すぐ 1 回回す
+journalctl -u mcp-coderunner-app-prune -n 5             # 1 回につき JSON 1 行
+sudo -u mcp-coderunner-app env DOCKER_HOST=unix:///run/user/$uid/docker.sock docker system df
+```
+
+強く削って失うのはビルド時間だけで、正しさではない。消えたイメージは次にそれを要求した
+ジョブが焼き直す。その取引は `/etc/mcp-coderunner-app/config.yml` の `build:` にある。
+ディスクが細いなら `cache_ttl_days` と `max_images` を下げ、同じ Blueprint を何度も
+焼き直しているようなら上げる。
+
+それでも埋まるなら、容量は docker の中に無い。`/var/lib/mcp-coderunner-app/work`
+（ジョブごとの作業ディレクトリ）と journal を次に見る。ディスクそのものを広げるのは
+qcow2 に対するホスト側の操作で、VM が自分でできることではない。
+
 ## 更新する
 
 ```sh
@@ -307,3 +338,4 @@ drop-in には触らない。
 | setup ツールが subuid/subgid が無いと言って止まる | `useradd --system` は割り当てない。`sudo usermod --add-subuids 200000-265535 --add-subgids 200000-265535 mcp-coderunner-app` のあと user 側の docker を再起動する |
 | `Cannot connect to the Docker daemon` | `/etc/mcp-coderunner-app/worker.env` が無いか uid が違う。または user 側の daemon が動いていない: `sudo -u mcp-coderunner-app env XDG_RUNTIME_DIR=/run/user/$(id -u mcp-coderunner-app) systemctl --user status docker` |
 | コンテナが残る | `docker ps -a --filter label=mcp-coderunner-app.job`。unit の起動前・停止後の掃除で回収される |
+| ディスクが埋まる、ビルドが `No space left on device` で落ちる | prune を手で 1 回回して（`sudo systemctl start mcp-coderunner-app-prune.service`）journal の行を読む。`build_cache` に容量が行っているなら `build.build_cache_ttl_hours` を下げる。「ディスク」を見る |

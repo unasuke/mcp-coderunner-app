@@ -52,6 +52,11 @@ main() {
   done
   systemctl daemon-reload
 
+  # A timer keeps the schedule it was loaded with, so a changed OnCalendar only
+  # takes effect once it restarts. try-restart, so a VM that never enabled the
+  # timer does not have it started here
+  systemctl try-restart mcp-coderunner-app-prune.timer
+
   systemctl restart "$UNIT"
 
   echo "restarted: ${before} -> ${after}"
