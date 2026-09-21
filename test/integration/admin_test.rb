@@ -284,6 +284,118 @@ class AdminTest < ActionDispatch::IntegrationTest
     assert_equal "running", job.state
   end
 
+  # The disk running out is the case this exists for: the job is finished, its
+  # result says why, and the same thing has to be run again once there is room
+  test "an admin re-runs a finished job" do
+    sign_in
+    @blueprint.update!(state: :approved)
+    job = Job.create!(blueprint: @blueprint, script: "puts 1", profile: "default",
+      entrypoint: [ "ruby", "/work/script.rb" ], state: :finished)
+    job.create_job_result!(termination_reason: "disk_full", applied_limits: {})
+
+    assert_difference -> { Job.count }, 1 do
+      post rerun_admin_job_path(job)
+    end
+
+    copy = Job.last
+
+    assert_redirected_to admin_job_path(copy)
+    assert_predicate copy, :queued?
+    assert_equal job, copy.retried_from
+    assert_equal "puts 1", copy.script
+    assert_equal [ "ruby", "/work/script.rb" ], copy.entrypoint
+    assert_equal "unasuke", copy.requested_by.login
+
+    # The run that failed is still there to compare against
+    assert_predicate job.reload, :finished?
+    assert_equal "disk_full", job.job_result.termination_reason
+  end
+
+  # A build that runs the disk out settles every job waiting on the same Blueprint
+  # (Jobs::RecordResult). Those were turned down by the failure, not by a person
+  test "a job rejected by a sibling's build failure can be re-run" do
+    sign_in
+    @blueprint.update!(state: :approved)
+    job = Job.create!(blueprint: @blueprint, script: "puts 1", profile: "default", state: :rejected)
+
+    post rerun_admin_job_path(job)
+
+    assert_predicate Job.last, :queued?
+    assert_equal job, Job.last.retried_from
+  end
+
+  # Re-running is submitting a copy, so it goes through the same gate. bench asks
+  # for a human every time it runs -- it takes the whole worker
+  test "re-running a job that needs review waits for it again" do
+    sign_in
+    @blueprint.update!(state: :approved)
+    job = Job.create!(blueprint: @blueprint, script: "puts 1", profile: "bench", state: :finished)
+
+    post rerun_admin_job_path(job)
+
+    assert_predicate Job.last, :pending_review?
+    assert_match(/承認すると実行されます/, flash[:notice])
+  end
+
+  # Nothing to copy. The retention job empties the script of a finished job at 90 days
+  test "a job whose script was purged cannot be re-run" do
+    sign_in
+    @blueprint.update!(state: :approved)
+    job = Job.create!(blueprint: @blueprint, script: "", profile: "default", state: :finished,
+      purged_at: Time.current)
+
+    assert_no_difference -> { Job.count } do
+      post rerun_admin_job_path(job)
+    end
+
+    assert_redirected_to admin_job_path(job)
+  end
+
+  # Revoking stops new submissions, and a re-run is a new submission
+  test "a job on a revoked blueprint cannot be re-run" do
+    sign_in
+    @blueprint.update!(state: :revoked)
+    job = Job.create!(blueprint: @blueprint, script: "puts 1", profile: "default", state: :finished)
+
+    assert_no_difference -> { Job.count } do
+      post rerun_admin_job_path(job)
+    end
+
+    assert_match(/再実行できません/, flash[:alert])
+  end
+
+  # Cancel is what a job that has not stopped yet offers. Running it twice on
+  # purpose is not something to reach through the same page
+  test "a running job cannot be re-run" do
+    sign_in
+    @blueprint.update!(state: :approved)
+    job = Job.create!(blueprint: @blueprint, script: "puts 1", profile: "default", state: :running)
+
+    assert_no_difference -> { Job.count } do
+      post rerun_admin_job_path(job)
+    end
+  end
+
+  # Both directions, so a page found from either end leads to the other
+  test "the job page links a re-run to what it came from" do
+    sign_in
+    @blueprint.update!(state: :approved)
+    job = Job.create!(blueprint: @blueprint, script: "puts 1", profile: "default", state: :finished)
+
+    post rerun_admin_job_path(job)
+    copy = Job.last
+
+    get admin_job_path(copy)
+
+    assert_response :success
+    assert_match(/再実行元/, response.body)
+
+    get admin_job_path(job)
+
+    assert_response :success
+    assert_match(/ジョブ ##{copy.id}/, response.body)
+  end
+
   test "an admin issues a worker token once" do
     sign_in
 

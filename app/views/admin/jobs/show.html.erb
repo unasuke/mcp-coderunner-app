@@ -34,6 +34,18 @@
       <%= since(@job.created_at) %>
     </dd>
 
+    <% if @job.retried_from %>
+      <dt>再実行元</dt>
+      <dd><%= link_to "ジョブ ##{@job.retried_from.id}", admin_job_path(@job.retried_from) %></dd>
+    <% end %>
+
+    <% if @reruns.any? %>
+      <dt>再実行</dt>
+      <dd>
+        <%= safe_join(@reruns.map { |rerun| link_to "ジョブ ##{rerun.id}", admin_job_path(rerun) }, "、") %>
+      </dd>
+    <% end %>
+
     <% if @job.cancel_requested? %>
       <dt>中断</dt>
       <dd class="warn">要求済み（<%= since(@job.cancel_requested_at) %>）。次の heartbeat でワーカーに伝わります。</dd>
@@ -151,6 +163,9 @@
     <% elsif @job.cancellable? %>
       <%= button_to "中断する", cancel_admin_job_path(@job), class: "btn-stop",
             form: { data: { turbo_confirm: "実行中のコンテナを落とします。" } } %>
+    <% elsif @job.rerunnable? %>
+      <%= button_to "再実行する", rerun_admin_job_path(@job), class: "btn-go",
+            form: { data: { turbo_confirm: rerun_confirmation(@job) } } %>
     <% end %>
   </div>
 </div>

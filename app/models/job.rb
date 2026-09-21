@@ -17,6 +17,11 @@ class Job < ApplicationRecord
   has_many :leases, dependent: :destroy
   has_one :job_result, dependent: :destroy
 
+  # A re-run is a new row, so this is what makes the pair read as a pair
+  belongs_to :retried_from, class_name: "Job", optional: true
+  has_many :reruns, class_name: "Job", foreign_key: :retried_from_id,
+    inverse_of: :retried_from, dependent: :nullify
+
   validates :script, length: { maximum: ->(_) { max_script_bytes } }
   validates :profile, inclusion: { in: Protocol::ResourceProfile::NAMES }
 
@@ -70,6 +75,18 @@ class Job < ApplicationRecord
 
   def cancellable?
     queued? || leased? || running?
+  end
+
+  # Only what has stopped. Anything from queued to running is still going to
+  # answer for itself, and running it twice on purpose is not a thing to offer by
+  # the same button that stops it. rejected counts because a build that ran the
+  # disk out settles every sibling waiting on it (Jobs::RecordResult), and those
+  # were turned down by the failure rather than by a person.
+  #
+  # The copy is submitted like any other job, so what it may not do is bounded
+  # there. Here it is only whether there is still something to copy
+  def rerunnable?
+    (finished? || rejected?) && !purged? && blueprint.approved?
   end
 
   def cancel_requested?

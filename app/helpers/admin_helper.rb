@@ -70,6 +70,17 @@ module AdminHelper
     number_to_human_size(value)
   end
 
+  # A re-run submits a copy, so the confirmation says what the copy will do rather
+  # than what the button is called. A rejected job was turned down -- by a person,
+  # or by a sibling's build failing -- and re-running it walks that back
+  def rerun_confirmation(job)
+    if job.rejected?
+      "却下されたジョブです。同じ内容で投入し直します。"
+    else
+      "同じ内容でもう一度実行します。この結果は残ります。"
+    end
+  end
+
   # Whether a worker is alive, shown in the top bar. It is behind most cases of a
   # job sitting in queued
   def worker_pulse

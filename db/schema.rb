@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_12_060000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_21_094500) do
   create_table "blueprint_files", force: :cascade do |t|
     t.integer "blueprint_id", null: false
     t.text "content", null: false
@@ -72,6 +72,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_12_060000) do
     t.string "profile", null: false
     t.datetime "purged_at"
     t.integer "requested_by_id"
+    t.integer "retried_from_id"
     t.text "script", null: false
     t.string "state", default: "pending_review", null: false
     t.datetime "updated_at", null: false
@@ -79,6 +80,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_12_060000) do
     t.index ["blueprint_id"], name: "index_jobs_on_blueprint_id"
     t.index ["oauth_application_id"], name: "index_jobs_on_oauth_application_id"
     t.index ["requested_by_id"], name: "index_jobs_on_requested_by_id"
+    t.index ["retried_from_id"], name: "index_jobs_on_retried_from_id"
     t.index ["state", "created_at"], name: "index_jobs_on_state_and_created_at"
   end
 
@@ -215,6 +217,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_12_060000) do
   add_foreign_key "blueprints", "users", column: "reviewed_by_id"
   add_foreign_key "job_results", "jobs"
   add_foreign_key "jobs", "blueprints"
+  add_foreign_key "jobs", "jobs", column: "retried_from_id"
   add_foreign_key "jobs", "oauth_applications"
   add_foreign_key "jobs", "users", column: "approved_by_id"
   add_foreign_key "jobs", "users", column: "requested_by_id"

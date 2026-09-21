@@ -36,6 +36,7 @@ Rails.application.routes.draw do
         post :approve
         post :reject
         post :cancel
+        post :rerun
       end
     end
 

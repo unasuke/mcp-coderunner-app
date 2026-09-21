@@ -70,6 +70,33 @@ class AdminConsoleTest < ApplicationSystemTestCase
     assert_current_path admin_blueprints_path
   end
 
+  # Re-running submits a copy, so the page that comes back is a different job than
+  # the one the button was on. The confirmation in between is Turbo's, and nothing
+  # below a browser sees it
+  test "re-running a job that ran out of disk lands on the copy" do
+    job = Job.create!(blueprint: create_blueprint(state: :approved), script: "puts 1\n",
+      profile: "default", state: :finished)
+    job.create_job_result!(termination_reason: "disk_full", applied_limits: {})
+
+    sign_in
+    visit admin_job_path(job)
+
+    assert_text "disk_full"
+
+    accept_confirm { click_on "再実行する" }
+
+    copy = Job.last
+
+    assert_current_path admin_job_path(copy)
+    assert_text "ジョブ ##{job.id} を再実行します"
+    assert_text "queued"
+
+    # And the way back to what it came from
+    within("dl.facts") { click_on "ジョブ ##{job.id}" }
+
+    assert_current_path admin_job_path(job)
+  end
+
   # Approving has to work from a phone, away from a desk. A horizontal scrollbar
   # puts the actions at the right edge of a table out of reach
   test "the console fits a phone-sized viewport" do

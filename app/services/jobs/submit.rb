@@ -12,13 +12,14 @@ module Jobs
     def self.call(...) = new(...).call
 
     def initialize(blueprint_ref:, script:, profile: Protocol::ResourceProfile::DEFAULT,
-                   entrypoint: nil, user: nil, oauth_application: nil)
+                   entrypoint: nil, user: nil, oauth_application: nil, retried_from: nil)
       @blueprint_ref = blueprint_ref.to_s
       @script = script.to_s
       @profile = (profile.presence || Protocol::ResourceProfile::DEFAULT).to_s
       @entrypoint = entrypoint
       @user = user
       @oauth_application = oauth_application
+      @retried_from = retried_from
     end
 
     def call
@@ -33,7 +34,8 @@ module Jobs
         entrypoint: @entrypoint.presence,
         state: review_needed?(blueprint) ? :pending_review : :queued,
         requested_by: @user,
-        oauth_application: @oauth_application
+        oauth_application: @oauth_application,
+        retried_from: @retried_from
       )
     end
 

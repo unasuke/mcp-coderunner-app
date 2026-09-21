@@ -9,6 +9,7 @@ module Admin
     def show
       @result = @job.job_result
       @leases = @job.leases.order(:created_at)
+      @reruns = @job.reruns.order(:id)
     end
 
     def approve
@@ -38,7 +39,30 @@ module Admin
       end
     end
 
+    # Running one again is submitting a copy of it, so the answer is a different
+    # job -- and the page to be on is the new one
+    def rerun
+      copy = Jobs::Rerun.call(job: @job, user: current_user)
+
+      unless copy
+        return redirect_to admin_job_path(@job),
+          alert: "再実行できません。終了済みで、スクリプトが残っていて、実行環境が承認済みのジョブだけです"
+      end
+
+      redirect_to admin_job_path(copy), notice: rerun_notice(copy)
+    rescue McpToolError => e
+      redirect_to admin_job_path(@job), alert: e.message
+    end
+
     private
+
+    def rerun_notice(copy)
+      if copy.queued?
+        "ジョブ ##{copy.retried_from_id} を再実行します"
+      else
+        "ジョブ ##{copy.retried_from_id} を複製しました。承認すると実行されます"
+      end
+    end
 
     def set_job
       @job = Job.find(params[:id])
