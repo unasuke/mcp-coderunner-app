@@ -1,7 +1,7 @@
 source "https://rubygems.org"
 
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
-gem "rails", "~> 8.1.3", ">= 8.1.3.1"
+gem "rails", "~> 8.1.4"
 # The modern asset pipeline for Rails [https://github.com/rails/propshaft]
 gem "propshaft"
 # Use sqlite3 as the database for Active Record
@@ -88,7 +88,7 @@ end
 
 gem "rouge", "~> 5.1"
 
-gem "reactionview", "~> 0.4.1"
-gem "herb", "~> 0.10.4"
+gem "reactionview", "~> 0.6.0"
+gem "herb", "~> 0.11.0"
 
 gem "web-push", "~> 3.1"
