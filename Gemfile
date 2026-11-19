@@ -88,7 +88,7 @@ end
 
 gem "rouge", "~> 5.1"
 
-gem "reactionview", "~> 0.6.0"
+gem "reactionview", "~> 0.6.1"
 gem "herb", "~> 0.11.1"
 
 gem "web-push", "~> 3.1"
